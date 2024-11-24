@@ -1,0 +1,18 @@
+{
+  "name": "raft",
+  "version": "1.0.0",
+  "description": "An implementation of Raft based on https://raft.github.io/raft.pdf and https://3700.network/docs/projects/raft/.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.9.3",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  }
+}
