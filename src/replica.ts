@@ -39,9 +39,8 @@ function sendMessage(replica: Replica, message: object): void {
     "127.0.0.1",
     (e) => {
       if (e) {
-        console.log("Error on message transmission", e);
+        console.error("Error on message transmission", e);
       }
-      console.error(e);
     }
   );
 }
@@ -64,19 +63,24 @@ function replicaEvents(replica: Replica): void {
   });
 }
 
-function setupArgs(): ReplicaOptions {
+function setupArgs() {
   const program = new Command();
   program
-    .option("-p, --port <number>", "Port number")
-    .option("-i, --id <string>", "Replica ID")
-    .option("-o, --others <items>", "Other replica ids", [])
+    .argument("<port>", "Port number")
+    .argument("<id>", "Replica ID")
+    .argument("[others...]", "Other replica ids")
     .parse();
-  return program.opts<ReplicaOptions>();
-}
 
+  const [port, id, ...others] = program.args;
+  return {
+    port: port ? Number(port) : 8000,
+    id: id || "test",
+    others: others || [],
+  };
+}
 async function runReplica() {
   const argOptions = setupArgs();
-  const replica = await createReplica(parseInt(argOptions.port), argOptions.id, argOptions.others);
+  const replica = await createReplica(argOptions.port, argOptions.id, argOptions.others);
   replicaEvents(replica);
   sendMessage(replica, TEST_MESSAGE);
 }
