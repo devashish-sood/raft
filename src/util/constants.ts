@@ -1,3 +1,5 @@
+import { fail } from "assert";
+
 export const Constants = Object.freeze({
   BROADCAST: "FFFF",
   GET: "get",
@@ -7,6 +9,9 @@ export const Constants = Object.freeze({
   CANDIDATE: "candidate",
   NOPULSE: "nopulse",
   PULSE: "pulse",
-  APPENDENTRIES: "AE", 
-  REQUESTVOTE: "RV",
+  OK: "ok",
+  FAIL: "fail",
+  APPENDENTRIES: "AE",
+  VOTEREQUEST: "VREQ",
+  VOTERESPONSE: "VRESP",
 });

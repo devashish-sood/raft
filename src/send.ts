@@ -1,6 +1,6 @@
 import { Constants } from "./util/constants";
 import { BusinessMessage, FailMessage } from "./util/message-schemas";
-import { Candidate, Config, Follower, ReplicaState } from "./util/types";
+import { Candidate, Config, Follower, Replica, ReplicaState } from "./util/types";
 
 /**
  * Sends a message from this replica.
@@ -33,10 +33,10 @@ function sendFail<T>(
     src: replica.config.id,
     dst: clientRequest.src,
     type: "fail",
-    leader: replica.leader,
+    leader: replica.leader ?? Constants.BROADCAST,
     MID: clientRequest.MID,
   };
   sendMessage(replica, clientResponse);
 }
 
-export { sendStartupMessage, sendMessage, sendFail };
+export {sendMessage, sendFail };

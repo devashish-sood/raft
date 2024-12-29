@@ -4,6 +4,7 @@ import { Config, Replica, ReplicaOptions } from "./util/types";
 import { Constants } from "./util/constants";
 import { randomInt } from "crypto";
 import { runFollower } from "./follower";
+import { runCandidate } from "./candidate";
 
 /**
  * Composite method to create and setup a replica

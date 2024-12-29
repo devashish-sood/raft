@@ -5,6 +5,7 @@
 // {"src": "<ID>", "dst": "<ID>", "leader": "<ID>", "type": "get", "MID": "<a unique
 //   "key": "<some key>"}
 
+import { Constants } from "./constants";
 import { Command } from "./types";
 
 type Message<T> = {
@@ -26,21 +27,23 @@ type ValueMessage = {
   value: string;
 };
 
-type FailMessage = BusinessMessage<"fail">;
-type OkMessage = BusinessMessage<"ok">;
+type FailMessage = BusinessMessage<typeof Constants.FAIL>;
+type OkMessage = BusinessMessage<typeof Constants.OK>;
 
-type GetRequestMessage = BusinessMessage<"get"> & KeyMessage;
+type GetRequestMessage = BusinessMessage<typeof Constants.GET> & KeyMessage;
 
 type GetSuccessMessage = OkMessage & ValueMessage;
 
-type PutRequestMessage = BusinessMessage<"put"> & KeyMessage & ValueMessage;
+type PutRequestMessage = BusinessMessage<typeof Constants.PUT> &
+  KeyMessage &
+  ValueMessage;
 
 type PutSuccessMessage = OkMessage;
 
 type ClientMessage = GetRequestMessage | PutRequestMessage;
 
 //Raft message types
-type AppendEntriesMessage = Message<"AE"> & {
+type AppendEntriesMessage = Message<typeof Constants.APPENDENTRIES> & {
   term: number;
   plogIdx: number;
   plogTerm: number;
@@ -48,19 +51,22 @@ type AppendEntriesMessage = Message<"AE"> & {
   lCommit: number;
 };
 
-type VoteRequestMessage = Message<"RV"> & {
+type VoteRequestMessage = Message<typeof Constants.VOTEREQUEST> & {
   term: number;
   candidateId: string;
   llogIdx: number;
   llogTerm: number;
 };
 
-type VoteResponseMessage = Message<"RV"> & {
+type VoteResponseMessage = Message<typeof Constants.VOTERESPONSE> & {
   term: number;
   voteGranted: boolean;
 };
 
-type ProtoMessage = VoteRequestMessage | AppendEntriesMessage;
+type ProtoMessage =
+  | VoteRequestMessage
+  | AppendEntriesMessage
+  | VoteResponseMessage;
 
 export {
   Message,
@@ -73,6 +79,6 @@ export {
   AppendEntriesMessage,
   ProtoMessage,
   ClientMessage,
-  VoteRequestMessage, 
-  VoteResponseMessage
+  VoteRequestMessage,
+  VoteResponseMessage,
 };

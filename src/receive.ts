@@ -7,7 +7,7 @@ import { ReplicaState } from "./util/types";
 export default function handleMessage(
   replica: ReplicaState,
   remoteInfo: RemoteInfo,
-  msg: string,
+  msg: string
 ): void {
   console.log("Received message from:", remoteInfo.address);
   console.log(msg);

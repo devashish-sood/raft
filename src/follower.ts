@@ -1,4 +1,4 @@
-import { sendFail, sendMessage, sendStartupMessage } from "./send";
+import { sendFail, sendMessage } from "./send";
 import { Constants } from "./util/constants";
 import { Candidate, Follower } from "./util/types";
 import {
@@ -25,7 +25,7 @@ function isBusinessMsg(msg: Message<any>): boolean {
 }
 
 function isProtoMsg(msg: Message<any>): boolean {
-  return [Constants.APPENDENTRIES, Constants.REQUESTVOTE].includes(msg.type);
+  return [Constants.APPENDENTRIES, Constants.VOTEREQUEST].includes(msg.type);
 }
 
 function listenForMessages(follower: Follower) {
@@ -39,15 +39,18 @@ function listenForMessages(follower: Follower) {
   });
 }
 
-function handleClientMessage(follower: Follower, msg: ClientMessage) {
-  follower.leader ? sendRedirect(follower, msg) : sendFail(follower, msg);
+function handleClientMessage(
+  replica: Follower | Candidate,
+  msg: ClientMessage
+) {
+  replica.leader ? sendRedirect(replica, msg) : sendFail(replica, msg);
 }
 
-function sendRedirect(follower: Follower, msg: ClientMessage) {
-  sendMessage(follower, {
-    src: follower.config.id,
+function sendRedirect(replica: Candidate | Follower, msg: ClientMessage) {
+  sendMessage(replica, {
+    src: replica.config.id,
     dst: msg.src,
-    leader: follower.leader,
+    leader: replica.leader,
     type: "redirect",
     MID: msg.MID,
   });
@@ -59,7 +62,7 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
       follower.lastAA = new Date();
       //Append entry message will be properly acknowledged here
       break;
-    case Constants.REQUESTVOTE:
+    case Constants.VOTEREQUEST:
       handleVoteRequest(follower, msg);
       break;
   }
@@ -112,7 +115,7 @@ function voteResponse(
   return {
     src: follower.config.id,
     dst: msg.src,
-    type: msg.type,
+    type: Constants.VOTERESPONSE,
     leader: Constants.BROADCAST,
     voteGranted: accept,
     term: follower.currentTerm,
@@ -150,4 +153,4 @@ function sendStartupMessage(replica: Follower) {
   sendMessage(replica, startupMessage);
 }
 
-export { runFollower };
+export { runFollower, handleClientMessage, isBusinessMsg, isProtoMsg };
