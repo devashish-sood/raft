@@ -1,22 +1,6 @@
 import { Constants } from "./util/constants";
 import { BusinessMessage, FailMessage } from "./util/message-schemas";
-import { Replica } from "./util/types";
-
-/**
- * Sends a startup message to the simulator, from this replica.
- *
- * @param {Replica} replica - The replica to send the message to.
- * @throws when `sendMessage` fails
- */
-function sendStartupMessage(replica: Replica) {
-  const startupMessage = {
-    src: replica.id,
-    dst: Constants.BROADCAST,
-    leader: Constants.BROADCAST,
-    type: "hello",
-  };
-  sendMessage(replica, startupMessage);
-}
+import { Candidate, Config, Follower, ReplicaState } from "./util/types";
 
 /**
  * Sends a message from this replica.
@@ -29,9 +13,9 @@ function sendMessage(replica: Replica, message: object): void {
   const strMsg = JSON.stringify(message);
   console.log("Sending message:", strMsg);
 
-  replica.socket.send(
+  replica.config.socket.send(
     Buffer.from(strMsg, "utf-8"),
-    replica.targetPort,
+    replica.config.targetPort,
     "127.0.0.1",
     (e) => {
       if (e) {
@@ -41,12 +25,12 @@ function sendMessage(replica: Replica, message: object): void {
   );
 }
 
-function sendFailResponse<T>(
-  replica: Replica,
+function sendFail<T>(
+  replica: Follower | Candidate,
   clientRequest: BusinessMessage<T>
 ) {
   const clientResponse: FailMessage = {
-    src: clientRequest.dst,
+    src: replica.config.id,
     dst: clientRequest.src,
     type: "fail",
     leader: replica.leader,
@@ -55,4 +39,4 @@ function sendFailResponse<T>(
   sendMessage(replica, clientResponse);
 }
 
-export { sendStartupMessage, sendMessage, sendFailResponse };
+export { sendStartupMessage, sendMessage, sendFail };

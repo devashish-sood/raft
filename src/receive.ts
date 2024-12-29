@@ -1,14 +1,13 @@
 import { RemoteInfo } from "dgram";
-import { RaftStore, Replica } from "./util/types";
 import { GetRequestMessage, PutRequestMessage } from "./util/message-schemas";
 import { Constants } from "./util/constants";
 import { sendFailResponse } from "./send";
+import { ReplicaState } from "./util/types";
 
 export default function handleMessage(
-  replica: Replica,
+  replica: ReplicaState,
   remoteInfo: RemoteInfo,
   msg: string,
-  store: RaftStore
 ): void {
   console.log("Received message from:", remoteInfo.address);
   console.log(msg);
@@ -17,20 +16,20 @@ export default function handleMessage(
     | PutRequestMessage;
   switch (parsedMessage.type) {
     case Constants.GET: {
-      handleGet(replica, parsedMessage, store);
+      handleGet(replica, parsedMessage);
       break;
     }
     case Constants.PUT: {
-      handlePut(replica, parsedMessage, store);
+      handlePut(replica, parsedMessage);
       break;
     }
   }
 }
 
-function handleGet(replica: Replica, msg: GetRequestMessage, store: RaftStore) {
+function handleGet(replica: ReplicaState, msg: GetRequestMessage) {
   sendFailResponse(replica, msg);
 }
 
-function handlePut(replica: Replica, msg: PutRequestMessage, store: RaftStore) {
+function handlePut(replica: ReplicaState, msg: PutRequestMessage) {
   sendFailResponse(replica, msg);
 }

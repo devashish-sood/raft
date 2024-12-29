@@ -1,16 +1,31 @@
 import { Command } from "commander";
 import dgram from "dgram";
-import { Replica, ReplicaOptions } from "./util/types";
-import handleMessage from "./receive";
+import { Config, Replica, ReplicaOptions } from "./util/types";
 import { Constants } from "./util/constants";
-import { sendStartupMessage } from "./send";
+import { randomInt } from "crypto";
+import { runFollower } from "./follower";
 
 /**
  * Composite method to create and setup a replica
  */
 async function runReplica() {
-  const replica = await createReplica(setupArgs());
-  startReplica(replica);
+  let replica = createReplica(await createConfig(setupArgs()));
+  while (true) {
+    switch (replica.role) {
+      case Constants.FOLLOWER: {
+        replica = await runFollower(replica);
+        break;
+      }
+      case Constants.CANDIDATE: {
+        replica = await runCandidate(replica);
+        break;
+      }
+      case Constants.LEADER: {
+        replica = await runLeader(replica);
+        break;
+      }
+    }
+  }
 }
 
 /**
@@ -20,7 +35,7 @@ async function runReplica() {
  * Side effect: Binds a port to the socket for listening purposes
  * @returns an object of type `Replica`
  */
-async function createReplica(options: ReplicaOptions): Promise<Replica> {
+async function createConfig(options: ReplicaOptions): Promise<Config> {
   const socket = dgram.createSocket("udp4");
   await bindSocket(socket);
   return {
@@ -28,23 +43,24 @@ async function createReplica(options: ReplicaOptions): Promise<Replica> {
     id: options.id,
     others: options.others,
     socket: socket,
-    leader: Constants.BROADCAST,
   };
 }
 
-/**
- * Sets up replica storage, starts listening for incoming messages, and sends startup message,
- * @param replica the `Replica` object
- */
-function startReplica(replica: Replica): void {
-  const store: { [key: string]: string } = {};
-  replica.socket.on("message", (msg, remoteInfo) => {
-    handleMessage(replica, remoteInfo, msg.toString("utf-8"), store);
-  });
-
-  sendStartupMessage(replica);
+function createReplica(config: Config): Replica {
+  return {
+    role: Constants.FOLLOWER,
+    leader: Constants.BROADCAST,
+    currentTerm: 0,
+    electionTimeout: randomInt(150, 301),
+    votedFor: undefined,
+    log: [],
+    commitIndex: 0,
+    lastApplied: 0,
+    store: {},
+    config,
+    lastAA: new Date(),
+  };
 }
-
 /**
  * Binds the given UDP socket to a random available port on the loopback interface.
  *

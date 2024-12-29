@@ -5,6 +5,8 @@
 // {"src": "<ID>", "dst": "<ID>", "leader": "<ID>", "type": "get", "MID": "<a unique
 //   "key": "<some key>"}
 
+import { Command } from "./types";
+
 type Message<T> = {
   src: string;
   dst: string;
@@ -35,11 +37,42 @@ type PutRequestMessage = BusinessMessage<"put"> & KeyMessage & ValueMessage;
 
 type PutSuccessMessage = OkMessage;
 
+type ClientMessage = GetRequestMessage | PutRequestMessage;
+
+//Raft message types
+type AppendEntriesMessage = Message<"AE"> & {
+  term: number;
+  plogIdx: number;
+  plogTerm: number;
+  entries: Command[];
+  lCommit: number;
+};
+
+type VoteRequestMessage = Message<"RV"> & {
+  term: number;
+  candidateId: string;
+  llogIdx: number;
+  llogTerm: number;
+};
+
+type VoteResponseMessage = Message<"RV"> & {
+  term: number;
+  voteGranted: boolean;
+};
+
+type ProtoMessage = VoteRequestMessage | AppendEntriesMessage;
+
 export {
+  Message,
   FailMessage,
   GetRequestMessage,
   GetSuccessMessage,
   PutRequestMessage,
   PutSuccessMessage,
   BusinessMessage,
+  AppendEntriesMessage,
+  ProtoMessage,
+  ClientMessage,
+  VoteRequestMessage, 
+  VoteResponseMessage
 };
