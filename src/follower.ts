@@ -1,6 +1,6 @@
 import { sendFail, sendMessage } from "./send";
 import { Constants } from "./util/constants";
-import { Candidate, Follower } from "./util/types";
+import { Candidate, Follower, Leader, Replica } from "./util/types";
 import {
   ClientMessage,
   Message,
@@ -10,6 +10,20 @@ import {
 } from "./util/message-schemas";
 import { setInterval, clearInterval } from "timers";
 import { toCandidate } from "./candidate";
+
+function toFollower(
+  replica: Candidate | Leader,
+  newTerm: number,
+  newLeader?: string
+): Follower {
+  return {
+    ...replica,
+    role: Constants.FOLLOWER,
+    currentTerm: newTerm,
+    votedFor: undefined,
+    leader: newLeader,
+  };
+}
 /**
  * Sets up replica storage, starts listening for incoming messages, and sends startup message,
  * @param config the `Replica` config
@@ -84,7 +98,10 @@ function evaluateCandidate(
     follower.leader = undefined;
     follower.votedFor = undefined;
   }
-  if (voteAvailable(follower, msg) && logIsValid(follower, msg)) {
+  if (
+    voteAvailable(follower, msg) &&
+    logIsValid(follower, msg.llogTerm, msg.llogIdx)
+  ) {
     follower.votedFor = msg.candidateId;
     return voteResponse(follower, msg, true);
   }
@@ -98,12 +115,11 @@ function voteAvailable(follower: Follower, msg: VoteRequestMessage) {
   );
 }
 
-function logIsValid(follower: Follower, msg: VoteRequestMessage) {
-  const repllogIdx = follower.log.length - 1;
-  const repllogTerm = repllogIdx >= 0 ? follower.log[repllogIdx].term : 0;
+function logIsValid(replica: Replica, llogTerm: number, llogIdx: number) {
+  const repllogIdx = replica.log.length - 1;
+  const repllogTerm = repllogIdx >= 0 ? replica.log[repllogIdx].term : 0;
   return (
-    msg.llogTerm > repllogTerm ||
-    (msg.llogTerm == repllogTerm && msg.llogIdx >= repllogIdx)
+    llogTerm > repllogTerm || (llogTerm == repllogTerm && llogIdx >= repllogIdx)
   );
 }
 
@@ -153,4 +169,10 @@ function sendStartupMessage(replica: Follower) {
   sendMessage(replica, startupMessage);
 }
 
-export { runFollower, handleClientMessage, isBusinessMsg, isProtoMsg };
+export {
+  toFollower,
+  runFollower,
+  handleClientMessage,
+  isBusinessMsg,
+  isProtoMsg,
+};
