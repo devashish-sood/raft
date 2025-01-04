@@ -26,7 +26,7 @@ function sendMessage(replica: Replica, message: object): void {
 }
 
 function sendFail<T>(
-  replica: Follower | Candidate,
+  replica: Replica,
   clientRequest: BusinessMessage<T>
 ) {
   const clientResponse: FailMessage = {

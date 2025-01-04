@@ -14,4 +14,5 @@ export const Constants = Object.freeze({
   APPENDENTRIES: "AE",
   VOTEREQUEST: "VREQ",
   VOTERESPONSE: "VRESP",
+  REDIRECT: "redirect"
 });

@@ -49,7 +49,10 @@ type ReplicaState<R extends Role> = {
 };
 
 type Follower = ReplicaState<FollowerRole>;
-type Leader = ReplicaState<LeaderRole>;
+type Leader = ReplicaState<LeaderRole> & {
+  nextIndex: { [key: string]: number };
+  matchIndex: { [key: string]: number };
+};
 type Candidate = ReplicaState<CandidateRole>;
 type Replica = Follower | Candidate | Leader;
 

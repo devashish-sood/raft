@@ -45,6 +45,7 @@ function isProtoMsg(msg: Message<any>): boolean {
 function listenForMessages(follower: Follower) {
   follower.config.socket.on("message", (msg, remoteInfo) => {
     const parsedMessage = JSON.parse(msg.toString("utf-8"));
+    handleClientMessage(follower, parsedMessage)
     if (isBusinessMsg(parsedMessage)) {
       handleClientMessage(follower, parsedMessage);
     } else if (isProtoMsg(parsedMessage)) {
@@ -65,7 +66,7 @@ function sendRedirect(replica: Candidate | Follower, msg: ClientMessage) {
     src: replica.config.id,
     dst: msg.src,
     leader: replica.leader,
-    type: "redirect",
+    type: Constants.REDIRECT,
     MID: msg.MID,
   });
 }
