@@ -1,67 +1,85 @@
 // src : The ID of the source of the message.
 // dst : The ID of the destination of the message.
 // leader : The ID of the leader, or "FFFF" if the leader’s ID is unknown.
-// type : The type of the message.
-// {"src": "<ID>", "dst": "<ID>", "leader": "<ID>", "type": "get", "MID": "<a unique
+// interface : The interface of the message.
+// {"src": "<ID>", "dst": "<ID>", "leader": "<ID> .  ", "interface": "get", "MID": "<a unique
 //   "key": "<some key>"}
 
 import { Constants } from "./constants";
 import { Command } from "./types";
 
-type Message<T> = {
+type MessageType =
+  | typeof Constants.GET
+  | typeof Constants.PUT
+  | typeof Constants.APPENDENTRIES
+  | typeof Constants.VOTEREQUEST
+  | typeof Constants.VOTERESPONSE
+  | typeof Constants.OK
+  | typeof Constants.FAIL
+  | typeof Constants.REDIRECT
+  | typeof Constants.HELLO;
+
+interface Message<T extends MessageType> {
   src: string;
   dst: string;
-  leader: string;
+  leader: string | undefined;
   type: T;
-};
+}
 
-type BusinessMessage<T> = Message<T> & {
+interface DataMessage<T extends MessageType> extends Message<T> {
   MID: string;
-};
+}
 
-type KeyMessage = {
+interface KeyMessage {
   key: string;
-};
+}
 
-type ValueMessage = {
+interface ValueMessage {
   value: string;
-};
+}
 
-type FailMessage = BusinessMessage<typeof Constants.FAIL>;
-type OkMessage = BusinessMessage<typeof Constants.OK>;
+interface FailMessage extends DataMessage<typeof Constants.FAIL> {}
+interface OkMessage extends DataMessage<typeof Constants.OK> {}
 
-type GetRequestMessage = BusinessMessage<typeof Constants.GET> & KeyMessage;
+interface GetRequestMessage
+  extends DataMessage<typeof Constants.GET>,
+    KeyMessage {}
 
-type GetSuccessMessage = OkMessage & ValueMessage;
+interface GetSuccessMessage extends OkMessage, ValueMessage {}
 
-type PutRequestMessage = BusinessMessage<typeof Constants.PUT> &
-  KeyMessage &
-  ValueMessage;
+interface PutRequestMessage
+  extends DataMessage<typeof Constants.PUT>,
+    KeyMessage,
+    ValueMessage {}
 
-type PutSuccessMessage = OkMessage;
+interface PutSuccessMessage extends OkMessage {}
 
-type ClientMessage = GetRequestMessage | PutRequestMessage;
+type BusinessMessage =
+  | GetRequestMessage
+  | PutRequestMessage
+  | GetSuccessMessage
+  | PutSuccessMessage;
 
-//Raft message types
-type AppendEntriesMessage = Message<typeof Constants.APPENDENTRIES> & {
+//Raft message interfaces
+interface AppendEntriesMessage extends Message<typeof Constants.APPENDENTRIES> {
   term: number;
   plogIdx: number;
   plogTerm: number;
   entries: Command[];
   lCommit: number;
-};
+}
 
-type VoteRequestMessage = Message<typeof Constants.VOTEREQUEST> & {
+interface VoteRequestMessage extends Message<typeof Constants.VOTEREQUEST> {
   term: number;
   candidateId: string;
   llogIdx: number;
   llogTerm: number;
-};
+}
 
-type VoteResponseMessage = Message<typeof Constants.VOTERESPONSE> & {
+interface VoteResponseMessage extends Message<typeof Constants.VOTERESPONSE> {
   term: number;
   voteGranted: boolean;
-};
+}
 
 type ProtoMessage =
   | VoteRequestMessage
@@ -69,6 +87,7 @@ type ProtoMessage =
   | VoteResponseMessage;
 
 export {
+  MessageType,
   Message,
   FailMessage,
   GetRequestMessage,
@@ -78,7 +97,6 @@ export {
   BusinessMessage,
   AppendEntriesMessage,
   ProtoMessage,
-  ClientMessage,
   VoteRequestMessage,
   VoteResponseMessage,
 };

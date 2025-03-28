@@ -2,9 +2,11 @@ import { sendFail, sendMessage } from "./send";
 import { Constants } from "./util/constants";
 import { Candidate, Follower, Leader, Replica } from "./util/types";
 import {
-  ClientMessage,
+  BusinessMessage,
+  GetRequestMessage,
   Message,
   ProtoMessage,
+  PutRequestMessage,
   VoteRequestMessage,
   VoteResponseMessage,
 } from "./util/message-schemas";
@@ -45,7 +47,7 @@ function isProtoMsg(msg: Message<any>): boolean {
 function listenForMessages(follower: Follower) {
   follower.config.socket.on("message", (msg, remoteInfo) => {
     const parsedMessage = JSON.parse(msg.toString("utf-8"));
-    handleClientMessage(follower, parsedMessage)
+    handleClientMessage(follower, parsedMessage);
     if (isBusinessMsg(parsedMessage)) {
       handleClientMessage(follower, parsedMessage);
     } else if (isProtoMsg(parsedMessage)) {
@@ -56,12 +58,15 @@ function listenForMessages(follower: Follower) {
 
 function handleClientMessage(
   replica: Follower | Candidate,
-  msg: ClientMessage
+  msg: GetRequestMessage | PutRequestMessage
 ) {
   replica.leader ? sendRedirect(replica, msg) : sendFail(replica, msg);
 }
 
-function sendRedirect(replica: Candidate | Follower, msg: ClientMessage) {
+function sendRedirect(
+  replica: Candidate | Follower,
+  msg: GetRequestMessage | PutRequestMessage
+) {
   sendMessage(replica, {
     src: replica.config.id,
     dst: msg.src,
@@ -165,7 +170,7 @@ function sendStartupMessage(replica: Follower) {
     src: replica.config.id,
     dst: Constants.BROADCAST,
     leader: Constants.BROADCAST,
-    type: "hello",
+    type: Constants.HELLO,
   };
   sendMessage(replica, startupMessage);
 }

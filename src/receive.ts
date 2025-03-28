@@ -1,11 +1,10 @@
 import { RemoteInfo } from "dgram";
 import { GetRequestMessage, PutRequestMessage } from "./util/message-schemas";
 import { Constants } from "./util/constants";
-import { sendFailResponse } from "./send";
-import { ReplicaState } from "./util/types";
+import { ReplicaState, Role } from "./util/types";
 
-export default function handleMessage(
-  replica: ReplicaState,
+export default function handleMessage<T extends Role>(
+  replica: ReplicaState<T>,
   remoteInfo: RemoteInfo,
   msg: string
 ): void {
@@ -26,10 +25,16 @@ export default function handleMessage(
   }
 }
 
-function handleGet(replica: ReplicaState, msg: GetRequestMessage) {
+function handleGet<T extends Role>(
+  replica: ReplicaState<T>,
+  msg: GetRequestMessage
+) {
   sendFailResponse(replica, msg);
 }
 
-function handlePut(replica: ReplicaState, msg: PutRequestMessage) {
+function handlePut<T extends Role>(
+  replica: ReplicaState<T>,
+  msg: PutRequestMessage
+) {
   sendFailResponse(replica, msg);
 }

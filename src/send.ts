@@ -1,6 +1,18 @@
 import { Constants } from "./util/constants";
-import { BusinessMessage, FailMessage } from "./util/message-schemas";
-import { Candidate, Config, Follower, Replica, ReplicaState } from "./util/types";
+import {
+  BusinessMessage,
+  FailMessage,
+  Message,
+  MessageType,
+  ProtoMessage,
+} from "./util/message-schemas";
+import {
+  Candidate,
+  Config,
+  Follower,
+  Replica,
+  ReplicaState,
+} from "./util/types";
 
 /**
  * Sends a message from this replica.
@@ -9,7 +21,10 @@ import { Candidate, Config, Follower, Replica, ReplicaState } from "./util/types
  * @throws when socket is unable to send a message
  */
 
-function sendMessage(replica: Replica, message: object): void {
+function sendMessage<T extends Message<U>, U extends MessageType>(
+  replica: Replica,
+  message: T
+): void {
   const strMsg = JSON.stringify(message);
   console.log("Sending message:", strMsg);
 
@@ -25,10 +40,7 @@ function sendMessage(replica: Replica, message: object): void {
   );
 }
 
-function sendFail<T>(
-  replica: Replica,
-  clientRequest: BusinessMessage<T>
-) {
+function sendFail(replica: Replica, clientRequest: BusinessMessage) {
   const clientResponse: FailMessage = {
     src: replica.config.id,
     dst: clientRequest.src,
@@ -39,4 +51,4 @@ function sendFail<T>(
   sendMessage(replica, clientResponse);
 }
 
-export {sendMessage, sendFail };
+export { sendMessage, sendFail };

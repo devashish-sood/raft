@@ -79,6 +79,7 @@ interface ReplicaOptions {
 }
 
 export {
+  Role,
   Config,
   ReplicaOptions,
   ReplicaState,

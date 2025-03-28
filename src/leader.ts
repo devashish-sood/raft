@@ -1,8 +1,11 @@
-import { config } from "process";
 import { Constants } from "./util/constants";
 import { Candidate, Follower, Leader } from "./util/types";
 import { isBusinessMsg, isProtoMsg } from "./follower";
-import { ClientMessage } from "./util/message-schemas";
+import {
+  BusinessMessage,
+  GetRequestMessage,
+  PutRequestMessage,
+} from "./util/message-schemas";
 import { sendFail } from "./send";
 
 function toLeader(candidate: Candidate): Leader {
@@ -34,7 +37,10 @@ function listenForMessages(leader: Leader, resolve: (value: Follower) => void) {
   });
 }
 
-function handleClientMessage(leader: Leader, msg: ClientMessage) {
+function handleClientMessage(
+  leader: Leader,
+  msg: GetRequestMessage | PutRequestMessage
+) {
   switch (msg.type) {
     case Constants.GET:
       if (leader.store[msg.key]) {
@@ -47,11 +53,23 @@ function handleClientMessage(leader: Leader, msg: ClientMessage) {
       try {
         leader.log.push({ key: msg.key, value: msg.value, MID: msg.MID });
         leader.store[msg.key] = msg.value;
-        sendPutSuccess(leader, msg) 
+        sendPutSuccess(leader, msg);
       } catch (e) {
-        sendFail(leader, msg)
+        sendFail(leader, msg);
       }
   }
 }
 
-export { toLeader, runLeader};
+function sendGetSuccess(leader: Leader, msg: GetRequestMessage) {}
+
+function sendPutSuccess(leader: Leader, msg: PutRequestMessage) {}
+
+function handleProtoMessage(
+  leader: Leader,
+  parsedMessage: any,
+  resolve: (value: Follower) => void
+) {
+  throw new Error("Function not implemented.");
+}
+
+export { toLeader, runLeader };
