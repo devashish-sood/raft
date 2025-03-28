@@ -10,9 +10,14 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^22.9.3",
+    "pretty-quick": "^4.1.1",
+    "simple-git-hooks": "^2.12.1",
     "typescript": "^5.7.2"
   },
   "dependencies": {
     "commander": "^12.1.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx pretty-quick --staged"
   }
 }

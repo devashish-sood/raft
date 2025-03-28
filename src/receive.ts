@@ -1,12 +1,13 @@
 import { RemoteInfo } from "dgram";
 import { GetRequestMessage, PutRequestMessage } from "./util/message-schemas";
 import { Constants } from "./util/constants";
-import { ReplicaState, Role } from "./util/types";
+import { Replica, ReplicaState, Role } from "./util/types";
+import { sendFail } from "./send";
 
-export default function handleMessage<T extends Role>(
-  replica: ReplicaState<T>,
+export default function handleMessage(
+  replica: Replica,
   remoteInfo: RemoteInfo,
-  msg: string
+  msg: string,
 ): void {
   console.log("Received message from:", remoteInfo.address);
   console.log(msg);
@@ -25,16 +26,10 @@ export default function handleMessage<T extends Role>(
   }
 }
 
-function handleGet<T extends Role>(
-  replica: ReplicaState<T>,
-  msg: GetRequestMessage
-) {
-  sendFailResponse(replica, msg);
+function handleGet(replica: Replica, msg: GetRequestMessage) {
+  sendFail(replica, msg);
 }
 
-function handlePut<T extends Role>(
-  replica: ReplicaState<T>,
-  msg: PutRequestMessage
-) {
-  sendFailResponse(replica, msg);
+function handlePut(replica: Replica, msg: PutRequestMessage) {
+  sendFail(replica, msg);
 }

@@ -34,8 +34,7 @@ type Role = FollowerRole | LeaderRole | CandidateRole;
  * @property {number} lastApplied - Most recently applied index
  * @property {[key: string]: string} store - key value store
  */
-type ReplicaState<R extends Role> = {
-  role: R;
+type ReplicaState = {
   currentTerm: number;
   electionTimeout: number;
   votedFor: string | undefined;
@@ -48,12 +47,16 @@ type ReplicaState<R extends Role> = {
   lastAA: Date;
 };
 
-type Follower = ReplicaState<FollowerRole>;
-type Leader = ReplicaState<LeaderRole> & {
+type Follower = ReplicaState & { role: FollowerRole };
+type Leader = ReplicaState & {
+  role: LeaderRole;
   nextIndex: { [key: string]: number };
+
   matchIndex: { [key: string]: number };
 };
-type Candidate = ReplicaState<CandidateRole>;
+type Candidate = ReplicaState & {
+  role: CandidateRole;
+};
 type Replica = Follower | Candidate | Leader;
 
 /**
