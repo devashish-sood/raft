@@ -16,23 +16,19 @@ import { toCandidate } from "./candidate";
 function toFollower(
   replica: Candidate | Leader,
   newTerm: number,
-  newLeader?: string,
+  newLeader: string | undefined,
 ): Follower {
   return {
     ...replica,
     role: Constants.FOLLOWER,
     currentTerm: newTerm,
-    votedFor: undefined,
+    votedFor: newLeader,
     leader: newLeader,
   };
 }
-/**
- * Sets up replica storage, starts listening for incoming messages, and sends startup message,
- * @param config the `Replica` config
- */
-async function runFollower(follower: Follower): Promise<Candidate> {
-  sendStartupMessage(follower);
-  const msgHandler = (msg: Buffer) => {
+
+function constructMsgHandler(follower: Follower) {
+  return (msg: Buffer) => {
     console.log(`received:`, msg.toString("utf-8"));
     const parsedMessage = JSON.parse(msg.toString("utf-8"));
     if (isBusinessMsg(parsedMessage)) {
@@ -41,8 +37,20 @@ async function runFollower(follower: Follower): Promise<Candidate> {
       handleProtoMsg(follower, parsedMessage);
     }
   };
+}
+
+/**
+ * Sets up replica storage, starts listening for incoming messages, and sends startup message,
+ * @param config the `Replica` config
+ */
+async function runFollower(follower: Follower): Promise<Candidate> {
+  sendStartupMessage(follower);
+  const msgHandler = constructMsgHandler(follower);
   listenForMessages(follower, msgHandler);
-  return checkPulse(follower).then<Candidate>(() => toCandidate(follower));
+  return checkPulse(follower).then<Candidate>(() => {
+    follower.config.socket.off("message", msgHandler);
+    return toCandidate(follower);
+  });
 }
 
 function isBusinessMsg(msg: Message<any>): boolean {
@@ -92,37 +100,38 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
   }
 }
 
-function handleVoteRequest(follower: Follower, msg: VoteRequestMessage) {
-  sendMessage(follower, evaluateCandidate(follower, msg));
+function handleVoteRequest(
+  replica: Follower | Candidate,
+  msg: VoteRequestMessage,
+) {
+  sendMessage(replica, evaluateCandidate(replica, msg));
 }
 
 function evaluateCandidate(
-  follower: Follower,
+  replica: Follower | Candidate,
   msg: VoteRequestMessage,
 ): VoteResponseMessage {
-  if (follower.currentTerm > msg.term) {
-    return voteResponse(follower, msg, false);
+  if (replica.currentTerm > msg.term) {
+    return voteResponse(replica, msg, false);
   }
-  if (follower.currentTerm < msg.term) {
-    follower.currentTerm = msg.term;
-    follower.leader = undefined;
-    follower.votedFor = undefined;
+  if (replica.currentTerm < msg.term) {
+    replica.currentTerm = msg.term;
+    replica.leader = undefined;
+    replica.votedFor = undefined;
   }
   if (
-    voteAvailable(follower, msg) &&
-    logIsValid(follower, msg.llogTerm, msg.llogIdx)
+    voteAvailable(replica, msg) &&
+    logIsValid(replica, msg.llogTerm, msg.llogIdx)
   ) {
-    follower.votedFor = msg.candidateId;
-    return voteResponse(follower, msg, true);
+    replica.votedFor = msg.candidateId;
+    return voteResponse(replica, msg, true);
   }
 
-  return voteResponse(follower, msg, false);
+  return voteResponse(replica, msg, false);
 }
 
-function voteAvailable(follower: Follower, msg: VoteRequestMessage) {
-  return (
-    follower.votedFor === undefined || follower.votedFor === msg.candidateId
-  );
+function voteAvailable(replica: Follower | Candidate, msg: VoteRequestMessage) {
+  return replica.votedFor === undefined || replica.votedFor === msg.candidateId;
 }
 
 function logIsValid(replica: Replica, llogTerm: number, llogIdx: number) {
@@ -134,17 +143,17 @@ function logIsValid(replica: Replica, llogTerm: number, llogIdx: number) {
 }
 
 function voteResponse(
-  follower: Follower,
+  replica: Follower | Candidate,
   msg: VoteRequestMessage,
   accept: boolean,
 ): VoteResponseMessage {
   return {
-    src: follower.config.id,
+    src: replica.config.id,
     dst: msg.src,
     type: Constants.VOTERESPONSE,
     leader: Constants.BROADCAST,
     voteGranted: accept,
-    term: follower.currentTerm,
+    term: replica.currentTerm,
   };
 }
 

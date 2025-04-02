@@ -29,7 +29,6 @@ function resetCandidate(replica: Candidate): void {
 async function runCandidate(candidate: Candidate): Promise<Replica> {
   const electionTimeout = setInterval(() => {
     resetCandidate(candidate);
-    // Transition to a new state or take appropriate action
   }, candidate.electionTimeout);
   return requestVotes(candidate);
 }
@@ -50,7 +49,7 @@ async function requestVotes(candidate: Candidate): Promise<Follower | Leader> {
 function handleProtoMessage(
   candidate: Candidate,
   msg: ProtoMessage,
-  resolve: (value: Follower | Leader | PromiseLike<Follower | Leader>) => void,
+  resolve: any,
 ): void {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
@@ -60,9 +59,10 @@ function handleProtoMessage(
       }
       break;
     case Constants.VOTEREQUEST:
+      //
       if (msg.term > candidate.currentTerm)
         //same paradigm here, so perhaps a better design is to send the raw message and have it loaded up in a message queue somehow to be read from.
-        [resolve(toFollower(candidate, msg.term))];
+        resolve(toFollower(candidate, msg.term, undefined));
       break;
     case Constants.VOTERESPONSE:
       if (msg.voteGranted) {
@@ -72,7 +72,7 @@ function handleProtoMessage(
           candidate.votes.length >=
           Math.ceil(candidate.config.others.length / 2)
         ) {
-          resolve(toLeader(candidate));
+          resolve(Constants.LEADER);
         }
       }
       break;
