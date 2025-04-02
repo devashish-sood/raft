@@ -16,7 +16,7 @@ import { toCandidate } from "./candidate";
 function toFollower(
   replica: Candidate | Leader,
   newTerm: number,
-  newLeader?: string
+  newLeader?: string,
 ): Follower {
   return {
     ...replica,
@@ -32,7 +32,16 @@ function toFollower(
  */
 async function runFollower(follower: Follower): Promise<Candidate> {
   sendStartupMessage(follower);
-  listenForMessages(follower);
+  const msgHandler = (msg: Buffer) => {
+    console.log(`received:`, msg.toString("utf-8"));
+    const parsedMessage = JSON.parse(msg.toString("utf-8"));
+    if (isBusinessMsg(parsedMessage)) {
+      handleClientMessage(follower, parsedMessage);
+    } else if (isProtoMsg(parsedMessage)) {
+      handleProtoMsg(follower, parsedMessage);
+    }
+  };
+  listenForMessages(follower, msgHandler);
   return checkPulse(follower).then<Candidate>(() => toCandidate(follower));
 }
 
@@ -44,28 +53,23 @@ function isProtoMsg(msg: Message<any>): boolean {
   return [Constants.APPENDENTRIES, Constants.VOTEREQUEST].includes(msg.type);
 }
 
-function listenForMessages(follower: Follower) {
-  follower.config.socket.on("message", (msg, remoteInfo) => {
-    const parsedMessage = JSON.parse(msg.toString("utf-8"));
-    handleClientMessage(follower, parsedMessage);
-    if (isBusinessMsg(parsedMessage)) {
-      handleClientMessage(follower, parsedMessage);
-    } else if (isProtoMsg(parsedMessage)) {
-      handleProtoMsg(follower, parsedMessage);
-    }
-  });
+function listenForMessages(
+  follower: Follower,
+  msgHandler: (msg: Buffer) => void,
+) {
+  follower.config.socket.on("message", msgHandler);
 }
 
 function handleClientMessage(
   replica: Follower | Candidate,
-  msg: GetRequestMessage | PutRequestMessage
+  msg: GetRequestMessage | PutRequestMessage,
 ) {
   replica.leader ? sendRedirect(replica, msg) : sendFail(replica, msg);
 }
 
 function sendRedirect(
   replica: Candidate | Follower,
-  msg: GetRequestMessage | PutRequestMessage
+  msg: GetRequestMessage | PutRequestMessage,
 ) {
   sendMessage(replica, {
     src: replica.config.id,
@@ -94,7 +98,7 @@ function handleVoteRequest(follower: Follower, msg: VoteRequestMessage) {
 
 function evaluateCandidate(
   follower: Follower,
-  msg: VoteRequestMessage
+  msg: VoteRequestMessage,
 ): VoteResponseMessage {
   if (follower.currentTerm > msg.term) {
     return voteResponse(follower, msg, false);
@@ -132,7 +136,7 @@ function logIsValid(replica: Replica, llogTerm: number, llogIdx: number) {
 function voteResponse(
   follower: Follower,
   msg: VoteRequestMessage,
-  accept: boolean
+  accept: boolean,
 ): VoteResponseMessage {
   return {
     src: follower.config.id,

@@ -53,7 +53,7 @@ function createReplica(config: Config): Replica {
     role: Constants.FOLLOWER,
     leader: Constants.BROADCAST,
     currentTerm: 0,
-    electionTimeout: randomInt(150, 301),
+    electionTimeout: randomInt(1500, 3000),
     votedFor: undefined,
     log: [],
     commitIndex: 0,
@@ -74,7 +74,7 @@ function bindSocket(socket: dgram.Socket): Promise<void> {
     socket.bind({ address: "127.0.0.1", port: 0 });
     socket.once("listening", () => {
       const addressInfo = socket.address();
-      console.log("Port assigned:", addressInfo);
+      console.log("port assigned:", addressInfo);
       resolve();
     });
   });

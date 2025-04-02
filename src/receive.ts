@@ -4,6 +4,7 @@ import { Constants } from "./util/constants";
 import { Replica, ReplicaState, Role } from "./util/types";
 import { sendFail } from "./send";
 
+// Nothing here should be used tbh, receiving is state dependent.
 export default function handleMessage(
   replica: Replica,
   remoteInfo: RemoteInfo,

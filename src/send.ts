@@ -4,15 +4,8 @@ import {
   FailMessage,
   Message,
   MessageType,
-  ProtoMessage,
 } from "./util/message-schemas";
-import {
-  Candidate,
-  Config,
-  Follower,
-  Replica,
-  ReplicaState,
-} from "./util/types";
+import { Replica } from "./util/types";
 
 /**
  * Sends a message from this replica.
@@ -21,12 +14,12 @@ import {
  * @throws when socket is unable to send a message
  */
 
-function sendMessage<T extends Message<U>, U extends MessageType>(
+function sendMessage<T extends Message<MessageType>>(
   replica: Replica,
-  message: T
+  message: T,
 ): void {
   const strMsg = JSON.stringify(message);
-  console.log("Sending message:", strMsg);
+  console.log("sending:", strMsg);
 
   replica.config.socket.send(
     Buffer.from(strMsg, "utf-8"),
@@ -36,7 +29,7 @@ function sendMessage<T extends Message<U>, U extends MessageType>(
       if (e) {
         console.error("Error on message transmission", e);
       }
-    }
+    },
   );
 }
 

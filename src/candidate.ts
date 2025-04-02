@@ -17,25 +17,31 @@ function toCandidate(replica: Follower | Candidate): Candidate {
     role: Constants.CANDIDATE,
     votedFor: replica.config.id,
     leader: undefined,
+    votes: [],
   };
 }
 
+function resetCandidate(replica: Candidate): void {
+  replica.currentTerm = replica.currentTerm + 1;
+  replica.votes = [];
+}
+
 async function runCandidate(candidate: Candidate): Promise<Replica> {
-  return Promise.race([
-    requestVotes(candidate),
-    setTimeout(candidate.electionTimeout, toCandidate(candidate)),
-  ]);
+  const electionTimeout = setInterval(() => {
+    resetCandidate(candidate);
+    // Transition to a new state or take appropriate action
+  }, candidate.electionTimeout);
+  return requestVotes(candidate);
 }
 
 async function requestVotes(candidate: Candidate): Promise<Follower | Leader> {
-  const votes: string[] = [];
   return new Promise<Follower | Leader>((resolve, _) => {
     candidate.config.socket.on("message", (msg) => {
       const parsedMessage = JSON.parse(msg.toString("utf-8"));
       if (isBusinessMsg(parsedMessage)) {
         handleClientMessage(candidate, parsedMessage);
       } else if (isProtoMsg(parsedMessage)) {
-        handleProtoMessage(candidate, parsedMessage, votes, resolve);
+        handleProtoMessage(candidate, parsedMessage, resolve);
       }
     });
   });
@@ -44,8 +50,7 @@ async function requestVotes(candidate: Candidate): Promise<Follower | Leader> {
 function handleProtoMessage(
   candidate: Candidate,
   msg: ProtoMessage,
-  votes: string[],
-  resolve: (value: Follower | Leader | PromiseLike<Follower | Leader>) => void
+  resolve: (value: Follower | Leader | PromiseLike<Follower | Leader>) => void,
 ): void {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
@@ -61,9 +66,12 @@ function handleProtoMessage(
       break;
     case Constants.VOTERESPONSE:
       if (msg.voteGranted) {
-        votes.push(msg.src);
+        candidate.votes.push(msg.src);
 
-        if (votes.length >= Math.ceil(candidate.config.others.length / 2)) {
+        if (
+          candidate.votes.length >=
+          Math.ceil(candidate.config.others.length / 2)
+        ) {
           resolve(toLeader(candidate));
         }
       }

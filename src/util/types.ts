@@ -56,6 +56,7 @@ type Leader = ReplicaState & {
 };
 type Candidate = ReplicaState & {
   role: CandidateRole;
+  votes: string[];
 };
 type Replica = Follower | Candidate | Leader;
 
