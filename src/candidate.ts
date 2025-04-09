@@ -27,18 +27,11 @@ function toCandidate(replica: Follower | Candidate): Candidate {
   };
 }
 
-function constructMsgHandler(
-  candidate: Candidate,
-  resolve: (value: Follower | Leader) => void,
-) {
-  return;
-}
-
 function requestVotes(candidate: Candidate, electInterval: NodeJS.Timeout) {
-  return new Promise<LeaderRole | FollowerRole>((resolve, _) => {
+  return new Promise<Leader | Follower>((resolve, _) => {
     const msgHandler = (msg: Buffer) => {
       const parsedMessage = JSON.parse(msg.toString("utf-8"));
-      const cleanupandResolve = (val: LeaderRole | FollowerRole) => {
+      const cleanupandResolve = (val: Leader | Follower) => {
         candidate.config.socket.off("message", msgHandler);
         clearTimeout(electInterval);
         resolve(val);
@@ -61,15 +54,7 @@ async function runCandidate(candidate: Candidate): Promise<Replica> {
     curCandidate = toCandidate(candidate);
   }, candidate.electionTimeout);
 
-  return requestVotes(candidate, electInterval).then<Follower | Leader>(
-    (val: LeaderRole | FollowerRole) => {
-      if (val === Constants.LEADER) {
-        return toLeader(curCandidate);
-      } else {
-        return toFollower(curCandidate, curCandidate.currentTerm, undefined);
-      }
-    },
-  );
+  return requestVotes(curCandidate, electInterval);
 }
 
 function handleProtoMessage(
@@ -98,7 +83,7 @@ function handleProtoMessage(
           candidate.votes.length >=
           Math.ceil(candidate.config.others.length / 2)
         ) {
-          resolve(Constants.LEADER);
+          resolve(toLeader(candidate));
         }
       }
       break;
