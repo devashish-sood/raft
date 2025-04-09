@@ -46,7 +46,7 @@ function constructMsgHandler(follower: Follower) {
 async function runFollower(follower: Follower): Promise<Candidate> {
   sendStartupMessage(follower);
   const msgHandler = constructMsgHandler(follower);
-  listenForMessages(follower, msgHandler);
+  follower.config.socket.on("message", msgHandler);
   return checkPulse(follower).then<Candidate>(() => {
     follower.config.socket.off("message", msgHandler);
     return toCandidate(follower);
@@ -59,13 +59,6 @@ function isBusinessMsg(msg: Message<any>): boolean {
 
 function isProtoMsg(msg: Message<any>): boolean {
   return [Constants.APPENDENTRIES, Constants.VOTEREQUEST].includes(msg.type);
-}
-
-function listenForMessages(
-  follower: Follower,
-  msgHandler: (msg: Buffer) => void,
-) {
-  follower.config.socket.on("message", msgHandler);
 }
 
 function handleClientMessage(

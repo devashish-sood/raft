@@ -7,8 +7,14 @@ import {
 import { toLeader } from "./leader";
 import { Constants } from "./util/constants";
 import { ProtoMessage } from "./util/message-schemas";
-import { Candidate, Follower, Leader, Replica } from "./util/types";
-import { setTimeout } from "timers/promises";
+import {
+  Candidate,
+  Follower,
+  FollowerRole,
+  Leader,
+  LeaderRole,
+  Replica,
+} from "./util/types";
 
 function toCandidate(replica: Follower | Candidate): Candidate {
   return {
@@ -21,29 +27,48 @@ function toCandidate(replica: Follower | Candidate): Candidate {
   };
 }
 
-function resetCandidate(replica: Candidate): void {
-  replica.currentTerm = replica.currentTerm + 1;
-  replica.votes = [];
+function constructMsgHandler(
+  candidate: Candidate,
+  resolve: (value: Follower | Leader) => void,
+) {
+  return;
 }
 
-async function runCandidate(candidate: Candidate): Promise<Replica> {
-  const electionTimeout = setInterval(() => {
-    resetCandidate(candidate);
-  }, candidate.electionTimeout);
-  return requestVotes(candidate);
-}
-
-async function requestVotes(candidate: Candidate): Promise<Follower | Leader> {
-  return new Promise<Follower | Leader>((resolve, _) => {
-    candidate.config.socket.on("message", (msg) => {
+function requestVotes(candidate: Candidate) {
+  return new Promise<LeaderRole | FollowerRole>((resolve, _) => {
+    const msgHandler = (msg: Buffer) => {
       const parsedMessage = JSON.parse(msg.toString("utf-8"));
+      const cleanupandResolve = (val: LeaderRole | FollowerRole) => {
+        candidate.config.socket.off("message", msgHandler);
+        resolve(val);
+      };
       if (isBusinessMsg(parsedMessage)) {
         handleClientMessage(candidate, parsedMessage);
       } else if (isProtoMsg(parsedMessage)) {
-        handleProtoMessage(candidate, parsedMessage, resolve);
+        handleProtoMessage(candidate, parsedMessage, cleanupandResolve);
       }
-    });
+    };
+
+    candidate.config.socket.on("message", msgHandler);
   });
+}
+
+async function runCandidate(candidate: Candidate): Promise<Replica> {
+  let curCandidate = candidate;
+
+  const electionTimeout = setInterval(() => {
+    curCandidate = toCandidate(candidate);
+  }, candidate.electionTimeout);
+
+  return requestVotes(candidate).then<Follower | Leader>(
+    (val: LeaderRole | FollowerRole) => {
+      if (val === Constants.LEADER) {
+        return toLeader(curCandidate);
+      } else {
+        return toFollower(curCandidate, curCandidate.currentTerm, undefined);
+      }
+    },
+  );
 }
 
 function handleProtoMessage(

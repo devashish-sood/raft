@@ -92,4 +92,6 @@ export {
   Leader,
   Candidate,
   Replica,
+  LeaderRole,
+  FollowerRole,
 };
