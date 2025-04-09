@@ -27,7 +27,7 @@ function toCandidate(replica: Follower | Candidate): Candidate {
   };
 }
 
-function requestVotes(candidate: Candidate, electInterval: NodeJS.Timeout) {
+function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
   return new Promise<Leader | Follower>((resolve, _) => {
     const msgHandler = (msg: Buffer) => {
       const parsedMessage = JSON.parse(msg.toString("utf-8"));
@@ -47,14 +47,20 @@ function requestVotes(candidate: Candidate, electInterval: NodeJS.Timeout) {
   });
 }
 
-async function runCandidate(candidate: Candidate): Promise<Replica> {
-  let curCandidate = candidate;
+function sendVoteRequests(candidate: Candidate): void {
+  candidate.config.others.forEach((neighbor) => {
+    // construct vote request message
+    // send vote request message
+    // TODO: incomplete
+  });
+}
 
+async function runCandidate(candidate: Candidate): Promise<Replica> {
   const electInterval = setInterval(() => {
-    curCandidate = toCandidate(candidate);
+    candidate = toCandidate(candidate);
   }, candidate.electionTimeout);
 
-  return requestVotes(curCandidate, electInterval);
+  return handleMessages(candidate, electInterval);
 }
 
 function handleProtoMessage(
