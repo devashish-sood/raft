@@ -5,7 +5,7 @@ import {
   toFollower,
 } from "./follower";
 import { toLeader } from "./leader";
-import { sendMessage } from "./send";
+import { sendBatch, sendMessage } from "./send";
 import { Constants } from "./util/constants";
 import { ProtoMessage, VoteRequestMessage } from "./util/message-schemas";
 import { Candidate, Follower, Leader, Replica } from "./util/types";
@@ -45,9 +45,9 @@ function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
 }
 
 function sendVoteRequests(candidate: Candidate): void {
-  const voteRequests = candidate.config.others.map((neighbor) => {
+  const vrMsgConstructor = (neighbor: string) => {
     const logLength = candidate.log.length > 0 ? candidate.log.length - 1 : 0;
-    const vrMessage: VoteRequestMessage = {
+    return {
       src: candidate.config.id,
       dst: neighbor,
       leader: candidate.leader ?? Constants.BROADCAST,
@@ -57,14 +57,9 @@ function sendVoteRequests(candidate: Candidate): void {
       llogIdx: logLength,
       llogTerm: logLength > 0 ? candidate.log[logLength].term : 0,
     };
-    return sendMessage(candidate, vrMessage);
-  });
+  };
 
-  Promise.all(voteRequests).then((results) => {
-    if (!results.every((result) => result === true)) {
-      console.error("Not all vote requests were successfully sent", candidate);
-    }
-  });
+  sendBatch(candidate, vrMsgConstructor);
 }
 
 async function runCandidate(candidate: Candidate): Promise<Replica> {
