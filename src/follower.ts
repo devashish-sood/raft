@@ -58,7 +58,11 @@ function isBusinessMsg(msg: Message<any>): boolean {
 }
 
 function isProtoMsg(msg: Message<any>): boolean {
-  return [Constants.APPENDENTRIES, Constants.VOTEREQUEST].includes(msg.type);
+  return [
+    Constants.APPENDENTRIES,
+    Constants.VOTEREQUEST,
+    Constants.VOTERESPONSE,
+  ].includes(msg.type);
 }
 
 function handleClientMessage(

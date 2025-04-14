@@ -8,14 +8,7 @@ import { toLeader } from "./leader";
 import { sendMessage } from "./send";
 import { Constants } from "./util/constants";
 import { ProtoMessage, VoteRequestMessage } from "./util/message-schemas";
-import {
-  Candidate,
-  Follower,
-  FollowerRole,
-  Leader,
-  LeaderRole,
-  Replica,
-} from "./util/types";
+import { Candidate, Follower, Leader, Replica } from "./util/types";
 
 function toCandidate(replica: Follower | Candidate): Candidate {
   return {
@@ -53,18 +46,16 @@ function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
 
 function sendVoteRequests(candidate: Candidate): void {
   const voteRequests = candidate.config.others.map((neighbor) => {
+    const logLength = candidate.log.length > 0 ? candidate.log.length - 1 : 0;
     const vrMessage: VoteRequestMessage = {
       src: candidate.config.id,
       dst: neighbor,
-      leader: undefined,
+      leader: candidate.leader ?? Constants.BROADCAST,
       type: Constants.VOTEREQUEST,
       term: candidate.currentTerm,
       candidateId: candidate.config.id,
-      llogIdx: candidate.log.length - 1,
-      llogTerm:
-        candidate.log.length > 0
-          ? candidate.log[candidate.log.length - 1].term
-          : 0,
+      llogIdx: logLength,
+      llogTerm: logLength > 0 ? candidate.log[logLength].term : 0,
     };
     return sendMessage(candidate, vrMessage);
   });
@@ -106,12 +97,13 @@ function handleProtoMessage(
       break;
     case Constants.VOTERESPONSE:
       if (msg.voteGranted) {
+        console.log("vote received: ", msg);
         candidate.votes.push(msg.src);
-
         if (
           candidate.votes.length >=
           Math.ceil(candidate.config.others.length / 2)
         ) {
+          console.log("leader elected!");
           resolve(toLeader(candidate));
         }
       }
