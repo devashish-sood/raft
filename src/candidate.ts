@@ -5,8 +5,9 @@ import {
   toFollower,
 } from "./follower";
 import { toLeader } from "./leader";
+import { sendMessage } from "./send";
 import { Constants } from "./util/constants";
-import { ProtoMessage } from "./util/message-schemas";
+import { ProtoMessage, VoteRequestMessage } from "./util/message-schemas";
 import {
   Candidate,
   Follower,
@@ -30,12 +31,15 @@ function toCandidate(replica: Follower | Candidate): Candidate {
 function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
   return new Promise<Leader | Follower>((resolve, _) => {
     const msgHandler = (msg: Buffer) => {
-      const parsedMessage = JSON.parse(msg.toString("utf-8"));
+      //callback for cleaning up listener on replica state change
       const cleanupandResolve = (val: Leader | Follower) => {
         candidate.config.socket.off("message", msgHandler);
         clearTimeout(electInterval);
         resolve(val);
       };
+
+      //construct and handle message
+      const parsedMessage = JSON.parse(msg.toString("utf-8"));
       if (isBusinessMsg(parsedMessage)) {
         handleClientMessage(candidate, parsedMessage);
       } else if (isProtoMsg(parsedMessage)) {
@@ -48,19 +52,38 @@ function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
 }
 
 function sendVoteRequests(candidate: Candidate): void {
-  candidate.config.others.forEach((neighbor) => {
-    // construct vote request message
-    // send vote request message
-    // TODO: incomplete
+  const voteRequests = candidate.config.others.map((neighbor) => {
+    const vrMessage: VoteRequestMessage = {
+      src: candidate.config.id,
+      dst: neighbor,
+      leader: undefined,
+      type: Constants.VOTEREQUEST,
+      term: candidate.currentTerm,
+      candidateId: candidate.config.id,
+      llogIdx: candidate.log.length - 1,
+      llogTerm:
+        candidate.log.length > 0
+          ? candidate.log[candidate.log.length - 1].term
+          : 0,
+    };
+    return sendMessage(candidate, vrMessage);
+  });
+
+  Promise.all(voteRequests).then((results) => {
+    if (!results.every((result) => result === true)) {
+      console.error("Not all vote requests were successfully sent", candidate);
+    }
   });
 }
 
 async function runCandidate(candidate: Candidate): Promise<Replica> {
+  let curCandidate = candidate;
   const electInterval = setInterval(() => {
-    candidate = toCandidate(candidate);
+    curCandidate = toCandidate(curCandidate);
+    sendVoteRequests(curCandidate);
   }, candidate.electionTimeout);
 
-  return handleMessages(candidate, electInterval);
+  return handleMessages(curCandidate, electInterval);
 }
 
 function handleProtoMessage(

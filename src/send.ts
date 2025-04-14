@@ -17,20 +17,25 @@ import { Replica } from "./util/types";
 function sendMessage<T extends Message<MessageType>>(
   replica: Replica,
   message: T,
-): void {
+): Promise<boolean> {
   const strMsg = JSON.stringify(message);
   console.log("sending:", strMsg);
 
-  replica.config.socket.send(
-    Buffer.from(strMsg, "utf-8"),
-    replica.config.targetPort,
-    "127.0.0.1",
-    (e) => {
-      if (e) {
-        console.error("Error on message transmission", e);
-      }
-    },
-  );
+  return new Promise((resolve, reject) => {
+    replica.config.socket.send(
+      Buffer.from(strMsg, "utf-8"),
+      replica.config.targetPort,
+      "127.0.0.1",
+      (e) => {
+        if (e) {
+          console.error("Error on message transmission", e, strMsg);
+          reject(e);
+        } else {
+          resolve(true);
+        }
+      },
+    );
+  });
 }
 
 function sendFail(replica: Replica, clientRequest: BusinessMessage) {
