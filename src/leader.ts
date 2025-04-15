@@ -2,7 +2,7 @@ import { Constants } from "./util/constants";
 import { Candidate, Follower, Leader } from "./util/types";
 import { isBusinessMsg, isProtoMsg } from "./follower";
 import {
-  BusinessMessage,
+  AppendEntriesMessage,
   GetRequestMessage,
   PutRequestMessage,
 } from "./util/message-schemas";
@@ -18,8 +18,22 @@ function toLeader(candidate: Candidate): Leader {
   };
 }
 
+function constructHeartbeat(leader: Leader): AppendEntriesMessage {
+  const lastLogIndex = leader.log.length - 1;
+  return {
+    src: leader.config.id,
+    dst: Constants.BROADCAST,
+    type: Constants.APPENDENTRIES,
+    term: leader.currentTerm,
+    leader: leader.config.id,
+    plogIdx: lastLogIndex,
+    plogTerm: lastLogIndex >= 0 ? leader.log[lastLogIndex].term : 0,
+    entries: [],
+    lCommit: leader.commitIndex,
+  };
+}
+
 async function runLeader(leader: Leader): Promise<Follower> {
-  // send initial heartbeat
   // add an interval executor that checks if 100 ms have passed since last message (last AA), and then send an empty heartbeat
   return new Promise<Follower>((resolve, _) => {
     listenForMessages(leader, resolve);
@@ -39,7 +53,7 @@ function listenForMessages(leader: Leader, resolve: (value: Follower) => void) {
 
 function handleClientMessage(
   leader: Leader,
-  msg: GetRequestMessage | PutRequestMessage
+  msg: GetRequestMessage | PutRequestMessage,
 ) {
   switch (msg.type) {
     case Constants.GET:
@@ -51,9 +65,15 @@ function handleClientMessage(
       break;
     case Constants.PUT:
       try {
-        leader.log.push({ key: msg.key, value: msg.value, MID: msg.MID });
-        leader.store[msg.key] = msg.value;
-        sendPutSuccess(leader, msg);
+        leader.log.push({
+          key: msg.key,
+          val: msg.value,
+          MID: msg.MID,
+          term: leader.currentTerm,
+        });
+        // leader shouldn't have to wait until majority acknowledgement comes through.
+        // Makes sense to use a buffer of pending commits, and keep updating them as I get acks from the followers
+        // When a commit meets majority requirement, I can apply it.
       } catch (e) {
         sendFail(leader, msg);
       }
@@ -67,7 +87,7 @@ function sendPutSuccess(leader: Leader, msg: PutRequestMessage) {}
 function handleProtoMessage(
   leader: Leader,
   parsedMessage: any,
-  resolve: (value: Follower) => void
+  resolve: (value: Follower) => void,
 ) {
   throw new Error("Function not implemented.");
 }

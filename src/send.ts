@@ -38,21 +38,6 @@ function sendMessage<T extends Message<MessageType>>(
   });
 }
 
-function sendBatch<T extends Message<MessageType>>(
-  replica: Replica,
-  msgConstructor: (n: string) => T,
-) {
-  const promises = replica.config.others.map((name) =>
-    sendMessage(replica, msgConstructor(name)),
-  );
-
-  Promise.all(promises).then((results) => {
-    if (!results.every((result) => result === true)) {
-      console.error("Not all vote requests were successfully sent", replica);
-    }
-  });
-}
-
 function sendFail(replica: Replica, clientRequest: BusinessMessage) {
   const clientResponse: FailMessage = {
     src: replica.config.id,
@@ -64,4 +49,4 @@ function sendFail(replica: Replica, clientRequest: BusinessMessage) {
   sendMessage(replica, clientResponse);
 }
 
-export { sendMessage, sendBatch, sendFail };
+export { sendMessage, sendFail };

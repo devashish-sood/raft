@@ -5,7 +5,7 @@ import {
   toFollower,
 } from "./follower";
 import { toLeader } from "./leader";
-import { sendBatch, sendMessage } from "./send";
+import { sendMessage } from "./send";
 import { Constants } from "./util/constants";
 import { ProtoMessage, VoteRequestMessage } from "./util/message-schemas";
 import { Candidate, Follower, Leader, Replica } from "./util/types";
@@ -45,21 +45,18 @@ function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
 }
 
 function sendVoteRequests(candidate: Candidate): void {
-  const vrMsgConstructor = (neighbor: string) => {
-    const logLength = candidate.log.length > 0 ? candidate.log.length - 1 : 0;
-    return {
-      src: candidate.config.id,
-      dst: neighbor,
-      leader: candidate.leader ?? Constants.BROADCAST,
-      type: Constants.VOTEREQUEST,
-      term: candidate.currentTerm,
-      candidateId: candidate.config.id,
-      llogIdx: logLength,
-      llogTerm: logLength > 0 ? candidate.log[logLength].term : 0,
-    };
-  };
+  const lastLogIndex = candidate.log.length - 1;
 
-  sendBatch(candidate, vrMsgConstructor);
+  sendMessage(candidate, {
+    src: candidate.config.id,
+    dst: Constants.BROADCAST,
+    leader: candidate.leader ?? Constants.BROADCAST,
+    type: Constants.VOTEREQUEST,
+    term: candidate.currentTerm,
+    candidateId: candidate.config.id,
+    llogIdx: lastLogIndex,
+    llogTerm: lastLogIndex >= 0 ? candidate.log[lastLogIndex].term : 0,
+  });
 }
 
 async function runCandidate(candidate: Candidate): Promise<Replica> {

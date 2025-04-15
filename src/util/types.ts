@@ -20,7 +20,12 @@ type Config = {
   socket: dgram.Socket;
 };
 
-type Command = any;
+type Command = {
+  key: string;
+  val: string;
+  term: number;
+  MID: string;
+};
 
 type Role = FollowerRole | LeaderRole | CandidateRole;
 
@@ -48,26 +53,20 @@ type ReplicaState = {
 };
 
 type Follower = ReplicaState & { role: FollowerRole };
+
 type Leader = ReplicaState & {
   role: LeaderRole;
   nextIndex: { [key: string]: number };
 
   matchIndex: { [key: string]: number };
 };
+
 type Candidate = ReplicaState & {
   role: CandidateRole;
   votes: string[];
 };
-type Replica = Follower | Candidate | Leader;
 
-/**
- * Represents the data associated with the current leader replica.
- * @typedef {Object} LeaderData
- * @property {Object<string, number>} nextIndex - A map of replica identifiers to the next index to send to each replica.
- */
-type LeaderData = {
-  nextIndex: { [key: string]: number };
-};
+type Replica = Follower | Candidate | Leader;
 
 /**
  * Represents the options for creating a new replica.
