@@ -31,7 +31,7 @@ function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
         resolve(val);
       };
 
-      //construct and handle message
+      //actual message handler
       const parsedMessage = JSON.parse(msg.toString("utf-8"));
       if (isBusinessMsg(parsedMessage)) {
         handleClientMessage(candidate, parsedMessage);

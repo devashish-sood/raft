@@ -1,12 +1,12 @@
 import { Constants } from "./util/constants";
 import { Candidate, Follower, Leader } from "./util/types";
-import { isBusinessMsg, isProtoMsg } from "./follower";
+import { isBusinessMsg, isProtoMsg, toFollower } from "./follower";
 import {
   AppendEntriesMessage,
   GetRequestMessage,
   PutRequestMessage,
 } from "./util/message-schemas";
-import { sendFail } from "./send";
+import { sendFail, sendMessage } from "./send";
 
 function toLeader(candidate: Candidate): Leader {
   return {
@@ -34,20 +34,30 @@ function constructHeartbeat(leader: Leader): AppendEntriesMessage {
 }
 
 async function runLeader(leader: Leader): Promise<Follower> {
-  // add an interval executor that checks if 100 ms have passed since last message (last AA), and then send an empty heartbeat
-  return new Promise<Follower>((resolve, _) => {
-    listenForMessages(leader, resolve);
-  });
-}
+  const heartbeatInterval = setInterval(
+    () => sendMessage(leader, constructHeartbeat(leader)),
+    (leader.electionTimeout * 4) / 5,
+  );
 
-function listenForMessages(leader: Leader, resolve: (value: Follower) => void) {
-  leader.config.socket.on("message", (msg) => {
-    const parsedMessage = JSON.parse(msg.toString("utf-8"));
-    if (isBusinessMsg(parsedMessage)) {
-      handleClientMessage(leader, parsedMessage);
-    } else if (isProtoMsg(parsedMessage)) {
-      handleProtoMessage(leader, parsedMessage, resolve);
-    }
+  return new Promise<Follower>((resolve, _) => {
+    const msgHandler = (msg: Buffer) => {
+      //callback for cleaning up listener/interval on replica state change
+      const cleanupAndResolve = (val: Follower) => {
+        clearInterval(heartbeatInterval);
+        leader.config.socket.off("message", msgHandler);
+        resolve(val);
+      };
+
+      //actual message handler
+      const parsedMessage = JSON.parse(msg.toString("utf-8"));
+      if (isBusinessMsg(parsedMessage)) {
+        handleClientMessage(leader, parsedMessage);
+      } else if (isProtoMsg(parsedMessage)) {
+        handleProtoMessage(leader, parsedMessage, cleanupAndResolve);
+      }
+    };
+
+    leader.config.socket.on("message", msgHandler);
   });
 }
 
