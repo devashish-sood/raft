@@ -77,7 +77,7 @@ function handleProtoMessage(
   switch (msg.type) {
     case Constants.APPENDENTRIES:
       if (msg.term >= candidate.currentTerm) {
-        //once the code for processing an AA message is return, here we need to return a follower that has processed one of those messages, instead of just the newly created follower
+        //once the code for processing an AE message is return, here we need to return a follower that has processed one of those messages, instead of just the newly created follower
         resolve(toFollower(candidate, msg.term, msg.src));
       }
       break;

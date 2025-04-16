@@ -61,7 +61,7 @@ function createReplica(config: Config): Replica {
     lastApplied: 0,
     store: {},
     config,
-    lastAA: new Date(),
+    lastAE: new Date(),
   };
 }
 /**

@@ -12,6 +12,7 @@ export const Constants = Object.freeze({
   OK: "ok",
   FAIL: "fail",
   APPENDENTRIES: "AE",
+  APPENDRESPONSE: "AR",
   VOTEREQUEST: "VREQ",
   VOTERESPONSE: "VRESP",
   REDIRECT: "redirect",

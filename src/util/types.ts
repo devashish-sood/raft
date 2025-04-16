@@ -51,7 +51,7 @@ type ReplicaState = {
   leader: string | undefined;
   store: { [key: string]: string };
   config: Config;
-  lastAA: Date;
+  lastAE: Date;
 };
 
 type Follower = ReplicaState & { role: FollowerRole };

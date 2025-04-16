@@ -4,6 +4,7 @@ import { isBusinessMsg, isProtoMsg, toFollower } from "./follower";
 import {
   AppendEntriesMessage,
   GetRequestMessage,
+  GetSuccessMessage,
   PutRequestMessage,
 } from "./util/message-schemas";
 import { sendFail, sendMessage } from "./send";
@@ -61,7 +62,7 @@ async function runLeader(leader: Leader): Promise<Follower> {
   });
 }
 
-function createAAMsg(
+function createAEMsg(
   leader: Leader,
   lLogIdx: number,
   cmd: Command,
@@ -79,6 +80,21 @@ function createAAMsg(
   };
 }
 
+function createGetSuccessMsg(
+  leader: Leader,
+  msg: GetRequestMessage,
+  value: string,
+): GetSuccessMessage {
+  return {
+    src: leader.config.id,
+    dst: msg.src,
+    type: Constants.OK,
+    leader: leader.leader,
+    value,
+    MID: msg.MID,
+  };
+}
+
 function handleClientMessage(
   leader: Leader,
   msg: GetRequestMessage | PutRequestMessage,
@@ -86,7 +102,10 @@ function handleClientMessage(
   switch (msg.type) {
     case Constants.GET:
       if (leader.store[msg.key]) {
-        sendGetSuccess(leader, msg);
+        sendMessage(
+          leader,
+          createGetSuccessMsg(leader, msg, leader.store[msg.key]),
+        );
       } else {
         sendFail(leader, msg);
       }
@@ -100,22 +119,16 @@ function handleClientMessage(
           term: leader.currentTerm,
           voteCount: 0,
         };
+        // pre-calculate llogidx for messages just to prevent race conditions
         leader.logBuffer[putCommand.MID] = putCommand;
         const cmdLogIndex = leader.log.length - 1;
         leader.log.push(putCommand);
-        sendMessage(leader, createAAMsg(leader, cmdLogIndex, putCommand));
-        // leader shouldn't have to wait until majority acknowledgement comes through.
-        // Makes sense to use a buffer of pending commits, and keep updating them as I get acks from the followers
-        // When a commit meets majority requirement, I can apply it.
+        sendMessage(leader, createAEMsg(leader, cmdLogIndex, putCommand));
       } catch (e) {
         sendFail(leader, msg);
       }
   }
 }
-
-function sendGetSuccess(leader: Leader, msg: GetRequestMessage) {}
-
-function sendPutSuccess(leader: Leader, msg: PutRequestMessage) {}
 
 function handleProtoMessage(
   leader: Leader,

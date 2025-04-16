@@ -60,6 +60,7 @@ function isBusinessMsg(msg: Message<any>): boolean {
 function isProtoMsg(msg: Message<any>): boolean {
   return [
     Constants.APPENDENTRIES,
+    Constants.APPENDRESPONSE,
     Constants.VOTEREQUEST,
     Constants.VOTERESPONSE,
   ].includes(msg.type);
@@ -88,7 +89,7 @@ function sendRedirect(
 function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
-      follower.lastAA = new Date();
+      follower.lastAE = new Date();
       //Append entry message will be properly acknowledged here
       break;
     case Constants.VOTEREQUEST:
@@ -159,7 +160,7 @@ async function checkPulse(follower: Follower) {
 
   const promise = new Promise((resolve, _) => {
     timer = setInterval(() => {
-      if (Date.now() - follower.lastAA.getTime() >= follower.electionTimeout) {
+      if (Date.now() - follower.lastAE.getTime() >= follower.electionTimeout) {
         clearInterval(timer);
         resolve(Constants.NOPULSE);
       }
