@@ -1,5 +1,5 @@
 import { Constants } from "./util/constants";
-import { Candidate, Follower, Leader } from "./util/types";
+import { Candidate, Command, Follower, Leader } from "./util/types";
 import { isBusinessMsg, isProtoMsg, toFollower } from "./follower";
 import {
   AppendEntriesMessage,
@@ -61,6 +61,24 @@ async function runLeader(leader: Leader): Promise<Follower> {
   });
 }
 
+function createAAMsg(
+  leader: Leader,
+  lLogIdx: number,
+  cmd: Command,
+): AppendEntriesMessage {
+  return {
+    src: leader.config.id,
+    dst: Constants.BROADCAST,
+    leader: leader.config.id,
+    type: Constants.APPENDENTRIES,
+    term: leader.currentTerm,
+    plogIdx: lLogIdx,
+    plogTerm: lLogIdx >= 0 ? leader.log[lLogIdx].term : 0,
+    lCommit: leader.commitIndex,
+    entries: [cmd],
+  };
+}
+
 function handleClientMessage(
   leader: Leader,
   msg: GetRequestMessage | PutRequestMessage,
@@ -75,12 +93,17 @@ function handleClientMessage(
       break;
     case Constants.PUT:
       try {
-        leader.log.push({
+        const putCommand = {
           key: msg.key,
           val: msg.value,
           MID: msg.MID,
           term: leader.currentTerm,
-        });
+          voteCount: 0,
+        };
+        leader.logBuffer[putCommand.MID] = putCommand;
+        const cmdLogIndex = leader.log.length - 1;
+        leader.log.push(putCommand);
+        sendMessage(leader, createAAMsg(leader, cmdLogIndex, putCommand));
         // leader shouldn't have to wait until majority acknowledgement comes through.
         // Makes sense to use a buffer of pending commits, and keep updating them as I get acks from the followers
         // When a commit meets majority requirement, I can apply it.
