@@ -1,10 +1,12 @@
 import { Constants } from "./util/constants";
-import { Candidate, Command, Follower, Leader } from "./util/types";
+import { Candidate, Command, Follower, Leader, Replica } from "./util/types";
 import { isBusinessMsg, isProtoMsg, toFollower } from "./follower";
 import {
   AppendEntriesMessage,
+  BusinessMessage,
   GetRequestMessage,
   GetSuccessMessage,
+  ProtoMessage,
   PutRequestMessage,
 } from "./util/message-schemas";
 import { sendFail, sendMessage } from "./send";
@@ -31,6 +33,7 @@ function constructHeartbeat(leader: Leader): AppendEntriesMessage {
     plogTerm: lastLogIndex >= 0 ? leader.log[lastLogIndex].term : 0,
     entries: [],
     lCommit: leader.commitIndex,
+    MID: "heartbeat",
   };
 }
 
@@ -77,6 +80,7 @@ function createAEMsg(
     plogTerm: lLogIdx >= 0 ? leader.log[lLogIdx].term : 0,
     lCommit: leader.commitIndex,
     entries: [cmd],
+    MID: cmd.MID,
   };
 }
 
@@ -95,10 +99,7 @@ function createGetSuccessMsg(
   };
 }
 
-function handleClientMessage(
-  leader: Leader,
-  msg: GetRequestMessage | PutRequestMessage,
-) {
+function handleClientMessage(leader: Leader, msg: BusinessMessage) {
   switch (msg.type) {
     case Constants.GET:
       if (leader.store[msg.key]) {
@@ -117,7 +118,7 @@ function handleClientMessage(
           val: msg.value,
           MID: msg.MID,
           term: leader.currentTerm,
-          voteCount: 0,
+          ackCount: 0,
         };
         // pre-calculate llogidx for messages just to prevent race conditions
         leader.logBuffer[putCommand.MID] = putCommand;
@@ -127,15 +128,47 @@ function handleClientMessage(
       } catch (e) {
         sendFail(leader, msg);
       }
+    default:
+      console.log("Unexpected message received", msg.type, msg);
+  }
+}
+
+function applyCommand(replica: Replica, cmd: Command) {
+  delete replica.logBuffer[cmd.MID];
+  replica.lastApplied;
+}
+
+function handleAppendResponse(leader: Leader, mid: string) {
+  let cmd = leader.logBuffer[mid];
+  cmd.ackCount += 1;
+
+  if (cmd.ackCount >= Math.ceil(leader.config.others.length / 2)) {
+    //TODO: An issue here is that if replicas die, how do we adjust our number of available replicas to adjust elections and log application
+    applyCommand(leader, cmd);
   }
 }
 
 function handleProtoMessage(
   leader: Leader,
-  parsedMessage: any,
+  msg: ProtoMessage,
   resolve: (value: Follower) => void,
 ) {
-  throw new Error("Function not implemented.");
+  switch (msg.type) {
+    case Constants.APPENDENTRIES:
+      if (msg.term > leader.currentTerm) {
+        toFollower(leader, msg.term);
+      }
+      break;
+    case Constants.APPENDRESPONSE:
+      if (leader.logBuffer[msg.MID] !== undefined) {
+        handleAppendResponse(leader, msg.MID);
+      }
+      break;
+    case Constants.VOTEREQUEST:
+      break;
+    case Constants.VOTERESPONSE:
+      break;
+  }
 }
 
 export { toLeader, runLeader };

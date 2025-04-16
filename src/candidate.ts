@@ -78,14 +78,14 @@ function handleProtoMessage(
     case Constants.APPENDENTRIES:
       if (msg.term >= candidate.currentTerm) {
         //once the code for processing an AE message is return, here we need to return a follower that has processed one of those messages, instead of just the newly created follower
-        resolve(toFollower(candidate, msg.term, msg.src));
+        resolve(toFollower(candidate, msg.term));
       }
       break;
     case Constants.VOTEREQUEST:
       //
       if (msg.term > candidate.currentTerm)
         //same paradigm here, so perhaps a better design is to send the raw message and have it loaded up in a message queue somehow to be read from.
-        resolve(toFollower(candidate, msg.term, undefined));
+        resolve(toFollower(candidate, msg.term));
       break;
     case Constants.VOTERESPONSE:
       if (msg.voteGranted) {

@@ -62,12 +62,19 @@ type BusinessMessage =
   | PutSuccessMessage;
 
 //Raft message interfaces
-interface AppendEntriesMessage extends Message<typeof Constants.APPENDENTRIES> {
+interface AppendEntriesMessage
+  extends DataMessage<typeof Constants.APPENDENTRIES> {
   term: number;
   plogIdx: number;
   plogTerm: number;
   entries: Command[];
   lCommit: number;
+}
+
+interface AppendResponseMessage
+  extends DataMessage<typeof Constants.APPENDRESPONSE> {
+  term: number;
+  success: boolean;
 }
 
 interface VoteRequestMessage extends Message<typeof Constants.VOTEREQUEST> {
@@ -80,12 +87,6 @@ interface VoteRequestMessage extends Message<typeof Constants.VOTEREQUEST> {
 interface VoteResponseMessage extends Message<typeof Constants.VOTERESPONSE> {
   term: number;
   voteGranted: boolean;
-}
-
-interface AppendResponseMessage
-  extends Message<typeof Constants.APPENDRESPONSE> {
-  term: number;
-  success: boolean;
 }
 
 type ProtoMessage =

@@ -13,17 +13,13 @@ import {
 import { setInterval, clearInterval } from "timers";
 import { toCandidate } from "./candidate";
 
-function toFollower(
-  replica: Candidate | Leader,
-  newTerm: number,
-  newLeader: string | undefined,
-): Follower {
+function toFollower(replica: Candidate | Leader, newTerm: number): Follower {
   return {
     ...replica,
     role: Constants.FOLLOWER,
     currentTerm: newTerm,
-    votedFor: newLeader,
-    leader: newLeader,
+    votedFor: undefined,
+    leader: undefined,
   };
 }
 
@@ -91,20 +87,15 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
     case Constants.APPENDENTRIES:
       follower.lastAE = new Date();
       //Append entry message will be properly acknowledged here
+      //TODO: implement
+      // need to make sure the leader is legitimate before doing stuff. might also have to recognize a leader change -- unsure
       break;
     case Constants.VOTEREQUEST:
-      handleVoteRequest(follower, msg);
+      sendMessage(follower, evaluateCandidate(follower, msg));
       break;
     default:
       console.log("Received an unexpected message", msg.type, msg);
   }
-}
-
-function handleVoteRequest(
-  replica: Follower | Candidate,
-  msg: VoteRequestMessage,
-) {
-  sendMessage(replica, evaluateCandidate(replica, msg));
 }
 
 function evaluateCandidate(

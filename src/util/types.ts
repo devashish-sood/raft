@@ -25,7 +25,7 @@ type Command = {
   val: string;
   term: number;
   MID: string;
-  voteCount: number;
+  ackCount: number;
 };
 
 type Role = FollowerRole | LeaderRole | CandidateRole;
