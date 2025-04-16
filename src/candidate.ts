@@ -100,6 +100,8 @@ function handleProtoMessage(
         }
       }
       break;
+    default:
+      console.log("Received an unexpected message", msg.type, msg);
   }
 }
 

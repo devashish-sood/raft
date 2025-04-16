@@ -95,6 +95,8 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
     case Constants.VOTEREQUEST:
       handleVoteRequest(follower, msg);
       break;
+    default:
+      console.log("Received an unexpected message", msg.type, msg);
   }
 }
 

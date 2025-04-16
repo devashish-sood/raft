@@ -12,6 +12,7 @@ type MessageType =
   | typeof Constants.GET
   | typeof Constants.PUT
   | typeof Constants.APPENDENTRIES
+  | typeof Constants.APPENDRESPONSE
   | typeof Constants.VOTEREQUEST
   | typeof Constants.VOTERESPONSE
   | typeof Constants.OK
@@ -81,10 +82,17 @@ interface VoteResponseMessage extends Message<typeof Constants.VOTERESPONSE> {
   voteGranted: boolean;
 }
 
+interface AppendResponseMessage
+  extends Message<typeof Constants.APPENDRESPONSE> {
+  term: number;
+  success: boolean;
+}
+
 type ProtoMessage =
   | VoteRequestMessage
   | AppendEntriesMessage
-  | VoteResponseMessage;
+  | VoteResponseMessage
+  | AppendResponseMessage;
 
 export {
   MessageType,
