@@ -56,7 +56,6 @@ function createReplica(config: Config): Replica {
     electionTimeout: randomInt(150, 300),
     votedFor: undefined,
     log: [],
-    logBuffer: {},
     commitIndex: 0,
     lastApplied: 0,
     store: {},

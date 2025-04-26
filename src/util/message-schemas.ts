@@ -73,6 +73,7 @@ interface AppendEntriesMessage
 
 interface AppendResponseMessage
   extends DataMessage<typeof Constants.APPENDRESPONSE> {
+  logIdx: number;
   term: number;
   success: boolean;
 }
@@ -105,6 +106,7 @@ export {
   PutSuccessMessage,
   BusinessMessage,
   AppendEntriesMessage,
+  AppendResponseMessage,
   ProtoMessage,
   VoteRequestMessage,
   VoteResponseMessage,

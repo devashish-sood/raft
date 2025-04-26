@@ -3,6 +3,7 @@ import { Candidate, Command, Follower, Leader, Replica } from "./util/types";
 import { isBusinessMsg, isProtoMsg, toFollower } from "./follower";
 import {
   AppendEntriesMessage,
+  AppendResponseMessage,
   BusinessMessage,
   GetRequestMessage,
   GetSuccessMessage,
@@ -10,6 +11,8 @@ import {
   PutRequestMessage,
 } from "./util/message-schemas";
 import { sendFail, sendMessage } from "./send";
+import { assert } from "console";
+import { AssertionError } from "assert";
 
 function toLeader(candidate: Candidate): Leader {
   return {
@@ -113,16 +116,16 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
       break;
     case Constants.PUT:
       try {
+        const cmdLogIndex = leader.log.length - 1;
         const putCommand = {
+          id: cmdLogIndex + 1,
           key: msg.key,
           val: msg.value,
           MID: msg.MID,
           term: leader.currentTerm,
-          ackCount: 0,
+          acks: [leader.config.id], // CHECK: account for self?
         };
         // pre-calculate llogidx for messages just to prevent race conditions
-        leader.logBuffer[putCommand.MID] = putCommand;
-        const cmdLogIndex = leader.log.length - 1;
         leader.log.push(putCommand);
         sendMessage(leader, createAEMsg(leader, cmdLogIndex, putCommand));
       } catch (e) {
@@ -133,18 +136,23 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
   }
 }
 
-function applyCommand(replica: Replica, cmd: Command) {
-  delete replica.logBuffer[cmd.MID];
-  replica.lastApplied;
-}
+function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
+  const cmd = leader.log[msg.logIdx]; // the command at the log in the response message
+  try {
+    assert(cmd !== undefined);
+    assert(cmd.MID == msg.MID);
 
-function handleAppendResponse(leader: Leader, mid: string) {
-  let cmd = leader.logBuffer[mid];
-  cmd.ackCount += 1;
-
-  if (cmd.ackCount >= Math.ceil(leader.config.others.length / 2)) {
-    //TODO: An issue here is that if replicas die, how do we adjust our number of available replicas to adjust elections and log application
-    applyCommand(leader, cmd);
+    if (!cmd.acks.includes(msg.src)) {
+      cmd.acks.push(msg.src);
+    }
+  } catch (e: unknown) {
+    if (e instanceof AssertionError) {
+      console.log("mismatch between leader log and follower append response.");
+      console.log("Leader log at that position:", cmd);
+      console.log("Follower append response:", msg);
+    } else {
+      throw e;
+    }
   }
 }
 
@@ -160,9 +168,7 @@ function handleProtoMessage(
       }
       break;
     case Constants.APPENDRESPONSE:
-      if (leader.logBuffer[msg.MID] !== undefined) {
-        handleAppendResponse(leader, msg.MID);
-      }
+      handleAppendResponse(leader, msg);
       break;
     case Constants.VOTEREQUEST:
       break;

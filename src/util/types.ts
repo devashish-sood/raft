@@ -21,11 +21,12 @@ type Config = {
 };
 
 type Command = {
+  id: number;
   key: string;
   val: string;
   term: number;
   MID: string;
-  ackCount: number;
+  acks: string[];
 };
 
 type Role = FollowerRole | LeaderRole | CandidateRole;
@@ -45,7 +46,6 @@ type ReplicaState = {
   electionTimeout: number;
   votedFor: string | undefined;
   log: Command[];
-  logBuffer: { [key: string]: Command };
   commitIndex: number;
   lastApplied: number;
   leader: string | undefined;
