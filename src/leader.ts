@@ -8,7 +8,7 @@ import {
   GetRequestMessage,
   GetSuccessMessage,
   ProtoMessage,
-  PutRequestMessage,
+  PutSuccessMessage,
 } from "./util/message-schemas";
 import { sendFail, sendMessage } from "./send";
 import { assert } from "console";
@@ -41,6 +41,7 @@ function constructHeartbeat(leader: Leader): AppendEntriesMessage {
 }
 
 async function runLeader(leader: Leader): Promise<Follower> {
+  sendMessage(leader, constructHeartbeat(leader));
   const heartbeatInterval = setInterval(
     () => sendMessage(leader, constructHeartbeat(leader)),
     (leader.electionTimeout * 4) / 5,
@@ -70,7 +71,7 @@ async function runLeader(leader: Leader): Promise<Follower> {
 
 function createAEMsg(
   leader: Leader,
-  lLogIdx: number,
+  plogIdx: number,
   cmd: Command,
 ): AppendEntriesMessage {
   return {
@@ -79,8 +80,8 @@ function createAEMsg(
     leader: leader.config.id,
     type: Constants.APPENDENTRIES,
     term: leader.currentTerm,
-    plogIdx: lLogIdx,
-    plogTerm: lLogIdx >= 0 ? leader.log[lLogIdx].term : 0,
+    plogIdx: plogIdx,
+    plogTerm: plogIdx >= 0 ? leader.log[plogIdx].term : 0,
     lCommit: leader.commitIndex,
     entries: [cmd],
     MID: cmd.MID,
@@ -102,6 +103,19 @@ function createGetSuccessMsg(
   };
 }
 
+function createPutSuccessMessage(
+  leader: Leader,
+  cmd: Command,
+): PutSuccessMessage {
+  return {
+    src: leader.config.id,
+    dst: cmd.src,
+    type: Constants.OK,
+    leader: leader.config.id,
+    MID: cmd.MID,
+  };
+}
+
 function handleClientMessage(leader: Leader, msg: BusinessMessage) {
   switch (msg.type) {
     case Constants.GET:
@@ -118,12 +132,13 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
       try {
         const cmdLogIndex = leader.log.length - 1;
         const putCommand = {
+          src: msg.src,
           id: cmdLogIndex + 1,
           key: msg.key,
           val: msg.value,
           MID: msg.MID,
           term: leader.currentTerm,
-          acks: [leader.config.id], // CHECK: account for self?
+          acks: [],
         };
         // pre-calculate llogidx for messages just to prevent race conditions
         leader.log.push(putCommand);
@@ -131,6 +146,7 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
       } catch (e) {
         sendFail(leader, msg);
       }
+      break;
     default:
       console.log("Unexpected message received", msg.type, msg);
   }
@@ -144,6 +160,10 @@ function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
 
     if (!cmd.acks.includes(msg.src)) {
       cmd.acks.push(msg.src);
+    }
+
+    if (cmd.acks.length >= Math.ceil(leader.config.others.length / 2)) {
+      sendMessage(leader, createPutSuccessMessage(leader, cmd));
     }
   } catch (e: unknown) {
     if (e instanceof AssertionError) {
@@ -164,7 +184,7 @@ function handleProtoMessage(
   switch (msg.type) {
     case Constants.APPENDENTRIES:
       if (msg.term > leader.currentTerm) {
-        toFollower(leader, msg.term);
+        resolve(toFollower(leader, msg.term));
       }
       break;
     case Constants.APPENDRESPONSE:

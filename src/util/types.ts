@@ -21,6 +21,7 @@ type Config = {
 };
 
 type Command = {
+  src: string;
   id: number;
   key: string;
   val: string;
