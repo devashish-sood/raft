@@ -185,4 +185,5 @@ export {
   handleClientMessage,
   isBusinessMsg,
   isProtoMsg,
+  voteResponse,
 };

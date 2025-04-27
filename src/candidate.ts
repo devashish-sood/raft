@@ -3,6 +3,7 @@ import {
   isBusinessMsg,
   isProtoMsg,
   toFollower,
+  voteResponse,
 } from "./follower";
 import { toLeader } from "./leader";
 import { sendMessage } from "./send";
@@ -19,6 +20,12 @@ function toCandidate(replica: Follower | Candidate): Candidate {
     leader: undefined,
     votes: [],
   };
+}
+
+function restartElection(candidate: Candidate) {
+  candidate.currentTerm += 1;
+  candidate.votes = [];
+  candidate.votedFor = candidate.config.id;
 }
 
 function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
@@ -60,13 +67,12 @@ function sendVoteRequests(candidate: Candidate): void {
 }
 
 async function runCandidate(candidate: Candidate): Promise<Replica> {
-  let curCandidate = candidate;
   const electInterval = setInterval(() => {
-    curCandidate = toCandidate(curCandidate);
-    sendVoteRequests(curCandidate);
+    restartElection(candidate);
+    sendVoteRequests(candidate);
   }, candidate.electionTimeout);
 
-  return handleMessages(curCandidate, electInterval);
+  return handleMessages(candidate, electInterval);
 }
 
 function handleProtoMessage(
@@ -83,13 +89,16 @@ function handleProtoMessage(
       break;
     case Constants.VOTEREQUEST:
       //
-      if (msg.term > candidate.currentTerm)
-        //same paradigm here, so perhaps a better design is to send the raw message and have it loaded up in a message queue somehow to be read from.
-        resolve(toFollower(candidate, msg.term));
+      if (msg.term > candidate.currentTerm) {
+        const follower = toFollower(candidate, msg.term);
+        sendMessage(follower, voteResponse(follower, msg, true));
+        console.log("candidate deferring to", msg.src);
+        resolve(follower);
+      }
       break;
     case Constants.VOTERESPONSE:
       if (msg.voteGranted) {
-        console.log("vote received: ", msg);
+        console.log("vote received: ", msg.src);
         candidate.votes.push(msg.src);
         if (
           candidate.votes.length >=

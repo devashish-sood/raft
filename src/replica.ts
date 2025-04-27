@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import dgram from "dgram";
-import { Config, Replica, ReplicaOptions } from "./util/types";
+import { Config, Follower, Replica, ReplicaOptions } from "./util/types";
 import { Constants } from "./util/constants";
 import { randomInt } from "crypto";
 import { runFollower } from "./follower";
@@ -11,7 +11,7 @@ import { runLeader } from "./leader";
  * Composite method to create and setup a replica
  */
 async function runReplica() {
-  let replica = createReplica(await createConfig(setupArgs()));
+  let replica: Replica = createReplica(await createConfig(setupArgs()));
   while (true) {
     switch (replica.role) {
       case Constants.FOLLOWER: {
@@ -48,7 +48,7 @@ async function createConfig(options: ReplicaOptions): Promise<Config> {
   };
 }
 
-function createReplica(config: Config): Replica {
+function createReplica(config: Config): Follower {
   return {
     role: Constants.FOLLOWER,
     leader: Constants.BROADCAST,
