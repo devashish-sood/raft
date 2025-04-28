@@ -17,4 +17,5 @@ export const Constants = Object.freeze({
   VOTERESPONSE: "VRESP",
   REDIRECT: "redirect",
   HELLO: "hello",
+  HEARTBEAT: "hb",
 });

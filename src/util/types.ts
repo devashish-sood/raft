@@ -28,6 +28,7 @@ type Command = {
   term: number;
   MID: string;
   acks: string[];
+  acked: boolean;
 };
 
 type Role = FollowerRole | LeaderRole | CandidateRole;
@@ -43,7 +44,7 @@ type Role = FollowerRole | LeaderRole | CandidateRole;
  * @property {[key: string]: string} store - key value store
  */
 type ReplicaState = {
-  currentTerm: number;
+  term: number;
   electionTimeout: number;
   votedFor: string | undefined;
   log: Command[];

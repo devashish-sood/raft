@@ -30,13 +30,12 @@ function constructHeartbeat(leader: Leader): AppendEntriesMessage {
     src: leader.config.id,
     dst: Constants.BROADCAST,
     type: Constants.APPENDENTRIES,
-    term: leader.currentTerm,
+    term: leader.term,
     leader: leader.config.id,
     plogIdx: lastLogIndex,
     plogTerm: lastLogIndex >= 0 ? leader.log[lastLogIndex].term : 0,
     entries: [],
     lCommit: leader.commitIndex,
-    MID: "heartbeat",
   };
 }
 
@@ -79,12 +78,11 @@ function createAEMsg(
     dst: Constants.BROADCAST,
     leader: leader.config.id,
     type: Constants.APPENDENTRIES,
-    term: leader.currentTerm,
+    term: leader.term,
     plogIdx: plogIdx,
     plogTerm: plogIdx >= 0 ? leader.log[plogIdx].term : 0,
     lCommit: leader.commitIndex,
     entries: [cmd],
-    MID: cmd.MID,
   };
 }
 
@@ -137,8 +135,9 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
           key: msg.key,
           val: msg.value,
           MID: msg.MID,
-          term: leader.currentTerm,
+          term: leader.term,
           acks: [],
+          acked: false,
         };
         // pre-calculate llogidx for messages just to prevent race conditions
         leader.log.push(putCommand);
@@ -156,13 +155,16 @@ function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
   const cmd = leader.log[msg.logIdx]; // the command at the log in the response message
   try {
     assert(cmd !== undefined);
-    assert(cmd.MID == msg.MID);
 
     if (!cmd.acks.includes(msg.src)) {
       cmd.acks.push(msg.src);
     }
 
-    if (cmd.acks.length >= Math.ceil(leader.config.others.length / 2)) {
+    if (
+      cmd.acks.length >= Math.ceil(leader.config.others.length / 2) &&
+      !cmd.acked
+    ) {
+      cmd.acked = true;
       sendMessage(leader, createPutSuccessMessage(leader, cmd));
     }
   } catch (e: unknown) {
@@ -183,7 +185,7 @@ function handleProtoMessage(
 ) {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
-      if (msg.term > leader.currentTerm) {
+      if (msg.term > leader.term) {
         resolve(toFollower(leader, msg.term));
       }
       break;

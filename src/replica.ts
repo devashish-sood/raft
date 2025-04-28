@@ -52,7 +52,7 @@ function createReplica(config: Config): Follower {
   return {
     role: Constants.FOLLOWER,
     leader: Constants.BROADCAST,
-    currentTerm: 0,
+    term: 0,
     electionTimeout: randomInt(150, 300),
     votedFor: undefined,
     log: [],

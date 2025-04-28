@@ -1,7 +1,9 @@
 import { sendFail, sendMessage } from "./send";
 import { Constants } from "./util/constants";
-import { Candidate, Follower, Leader, Replica } from "./util/types";
+import { Candidate, Command, Follower, Leader, Replica } from "./util/types";
 import {
+  AppendEntriesMessage,
+  AppendResponseMessage,
   BusinessMessage,
   GetRequestMessage,
   Message,
@@ -17,7 +19,7 @@ function toFollower(replica: Candidate | Leader, newTerm: number): Follower {
   return {
     ...replica,
     role: Constants.FOLLOWER,
-    currentTerm: newTerm,
+    term: newTerm,
     votedFor: undefined,
     leader: undefined,
   };
@@ -86,9 +88,13 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
       follower.lastAE = new Date();
-      //Append entry message will be properly acknowledged here
-      //TODO: implement
-      // need to make sure the leader is legitimate before doing stuff. might also have to recognize a leader change -- unsure
+      if (msg.entries.length == 0) {
+        //heartbeat
+        follower.leader = msg.src;
+        follower.term = msg.term;
+      } else {
+        handleAEMessage(follower, msg);
+      }
       break;
     case Constants.VOTEREQUEST:
       sendMessage(follower, evaluateCandidate(follower, msg));
@@ -98,15 +104,63 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
   }
 }
 
+function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
+  if (msg.term < follower.term) {
+    sendMessage(follower, constructAEResponse(follower, msg, false));
+  } else if (
+    msg.plogIdx > 0 &&
+    (follower.log.length <= msg.plogIdx ||
+      follower.log[msg.plogIdx].term !== msg.plogTerm)
+  ) {
+    sendMessage(follower, constructAEResponse(follower, msg, false));
+  } else {
+    appendEntries(follower, msg.entries, msg.plogIdx + 1);
+    sendMessage(follower, constructAEResponse(follower, msg, true));
+  }
+}
+
+function appendEntries(
+  follower: Follower,
+  entries: Command[],
+  startIndex: number,
+) {
+  for (let offset = 0; offset < entries.length; offset++) {
+    if (follower.log[startIndex + offset]?.term == entries[offset].term) {
+      continue;
+    } else {
+      if (follower.log[startIndex + offset]) {
+        follower.log.splice(startIndex + offset);
+      }
+      follower.log[startIndex + offset] = entries[offset];
+    }
+  }
+}
+
+function constructAEResponse(
+  follower: Follower,
+  msg: AppendEntriesMessage,
+  success: boolean,
+): AppendResponseMessage {
+  return {
+    src: follower.config.id,
+    dst: msg.src,
+    type: Constants.APPENDRESPONSE,
+    leader: follower.leader,
+    logIdx: msg.plogIdx + 1,
+    term: follower.term,
+    success,
+  };
+}
+
 function evaluateCandidate(
   replica: Follower | Candidate,
   msg: VoteRequestMessage,
 ): VoteResponseMessage {
-  if (replica.currentTerm > msg.term) {
+  if (replica.term > msg.term) {
     return voteResponse(replica, msg, false);
   }
-  if (replica.currentTerm < msg.term) {
-    replica.currentTerm = msg.term;
+  if (replica.term < msg.term) {
+    replica.term = msg.term;
     replica.leader = undefined;
     replica.votedFor = undefined;
   }
@@ -144,7 +198,7 @@ function voteResponse(
     type: Constants.VOTERESPONSE,
     leader: Constants.BROADCAST,
     voteGranted: accept,
-    term: replica.currentTerm,
+    term: replica.term,
   };
 }
 

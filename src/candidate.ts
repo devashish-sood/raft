@@ -14,7 +14,7 @@ import { Candidate, Follower, Leader, Replica } from "./util/types";
 function toCandidate(replica: Follower | Candidate): Candidate {
   return {
     ...replica,
-    currentTerm: replica.currentTerm + 1,
+    term: replica.term + 1,
     role: Constants.CANDIDATE,
     votedFor: replica.config.id,
     leader: undefined,
@@ -23,7 +23,7 @@ function toCandidate(replica: Follower | Candidate): Candidate {
 }
 
 function restartElection(candidate: Candidate) {
-  candidate.currentTerm += 1;
+  candidate.term += 1;
   candidate.votes = [];
   candidate.votedFor = candidate.config.id;
 }
@@ -59,7 +59,7 @@ function sendVoteRequests(candidate: Candidate): void {
     dst: Constants.BROADCAST,
     leader: candidate.leader ?? Constants.BROADCAST,
     type: Constants.VOTEREQUEST,
-    term: candidate.currentTerm,
+    term: candidate.term,
     candidateId: candidate.config.id,
     llogIdx: lastLogIndex,
     llogTerm: lastLogIndex >= 0 ? candidate.log[lastLogIndex].term : 0,
@@ -82,14 +82,14 @@ function handleProtoMessage(
 ): void {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
-      if (msg.term >= candidate.currentTerm) {
+      if (msg.term >= candidate.term) {
         //once the code for processing an AE message is return, here we need to return a follower that has processed one of those messages, instead of just the newly created follower
         resolve(toFollower(candidate, msg.term));
       }
       break;
     case Constants.VOTEREQUEST:
       //
-      if (msg.term > candidate.currentTerm) {
+      if (msg.term > candidate.term) {
         const follower = toFollower(candidate, msg.term);
         sendMessage(follower, voteResponse(follower, msg, true));
         console.log("candidate deferring to", msg.src);

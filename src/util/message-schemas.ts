@@ -62,8 +62,7 @@ type BusinessMessage =
   | PutSuccessMessage;
 
 //Raft message interfaces
-interface AppendEntriesMessage
-  extends DataMessage<typeof Constants.APPENDENTRIES> {
+interface AppendEntriesMessage extends Message<typeof Constants.APPENDENTRIES> {
   term: number;
   plogIdx: number;
   plogTerm: number;
@@ -72,7 +71,7 @@ interface AppendEntriesMessage
 }
 
 interface AppendResponseMessage
-  extends DataMessage<typeof Constants.APPENDRESPONSE> {
+  extends Message<typeof Constants.APPENDRESPONSE> {
   logIdx: number;
   term: number;
   success: boolean;
