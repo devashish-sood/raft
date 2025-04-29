@@ -11,8 +11,6 @@ import {
   PutSuccessMessage,
 } from "./util/message-schemas";
 import { sendFail, sendMessage } from "./send";
-import { assert } from "console";
-import { AssertionError } from "assert";
 
 function toLeader(candidate: Candidate): Leader {
   return {
@@ -21,6 +19,7 @@ function toLeader(candidate: Candidate): Leader {
     leader: candidate.config.id,
     nextIndex: {},
     matchIndex: {},
+    lastAE: new Date(),
   };
 }
 
@@ -139,30 +138,25 @@ function createPutSuccessMessage(
 function handleClientMessage(leader: Leader, msg: BusinessMessage) {
   switch (msg.type) {
     case Constants.GET:
-      if (leader.store[msg.key]) {
-        sendMessage(
-          leader,
-          createGetSuccessMsg(leader, msg, leader.store[msg.key]),
-        );
-      } else {
-        sendFail(leader, msg);
-      }
+      sendMessage(
+        leader,
+        createGetSuccessMsg(leader, msg, leader.store[msg.key] ?? ""),
+      );
       break;
     case Constants.PUT:
       try {
         const cmdLogIndex = leader.log.length - 1;
         const putCommand = {
           src: msg.src,
-          id: cmdLogIndex + 1,
           key: msg.key,
           val: msg.value,
           MID: msg.MID,
           term: leader.term,
-          acks: [],
-          acked: false,
         };
         // pre-calculate llogidx for messages just to prevent race conditions
         leader.log.push(putCommand);
+        leader.matchIndex[leader.config.id] = cmdLogIndex + 1;
+        updateCommitIdx(leader);
         sendMessage(leader, createAEMsg(leader, cmdLogIndex, putCommand));
         leader.lastAE = new Date();
       } catch (e) {
@@ -204,16 +198,21 @@ function handleProtoMessage(
     case Constants.APPENDENTRIES:
       if (msg.term > leader.term) {
         resolve(toFollower(leader, msg.term));
+        return;
       }
       break;
     case Constants.APPENDRESPONSE:
       handleAppendResponse(leader, msg);
       break;
     case Constants.VOTEREQUEST:
+      if (msg.term > leader.term) {
+        resolve(toFollower(leader, msg.term));
+        return;
+      }
       break;
     case Constants.VOTERESPONSE:
       break;
   }
 }
 
-export { toLeader, runLeader };
+export { toLeader, runLeader, applyCommits };

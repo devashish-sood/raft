@@ -1,11 +1,11 @@
 import {
-  handleClientMessage,
   isBusinessMsg,
   isProtoMsg,
+  sendRedirect,
   toFollower,
   voteResponse,
 } from "./follower";
-import { toLeader } from "./leader";
+import { applyCommits, toLeader } from "./leader";
 import { sendMessage } from "./send";
 import { Constants } from "./util/constants";
 import { ProtoMessage, VoteRequestMessage } from "./util/message-schemas";
@@ -19,6 +19,7 @@ function toCandidate(replica: Follower | Candidate): Candidate {
     votedFor: replica.config.id,
     leader: undefined,
     votes: [],
+    lastAE: new Date(),
   };
 }
 
@@ -34,14 +35,14 @@ function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
       //callback for cleaning up listener on replica state change
       const cleanupandResolve = (val: Leader | Follower) => {
         candidate.config.socket.off("message", msgHandler);
-        clearTimeout(electInterval);
+        clearInterval(electInterval);
         resolve(val);
       };
 
       //actual message handler
       const parsedMessage = JSON.parse(msg.toString("utf-8"));
       if (isBusinessMsg(parsedMessage)) {
-        handleClientMessage(candidate, parsedMessage);
+        sendRedirect(candidate, parsedMessage);
       } else if (isProtoMsg(parsedMessage)) {
         handleProtoMessage(candidate, parsedMessage, cleanupandResolve);
       }
@@ -68,6 +69,7 @@ function sendVoteRequests(candidate: Candidate): void {
 
 async function runCandidate(candidate: Candidate): Promise<Replica> {
   const electInterval = setInterval(() => {
+    applyCommits(candidate);
     restartElection(candidate);
     sendVoteRequests(candidate);
   }, candidate.electionTimeout);
@@ -82,9 +84,9 @@ function handleProtoMessage(
 ): void {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
-      if (msg.term >= candidate.term) {
-        //once the code for processing an AE message is return, here we need to return a follower that has processed one of those messages, instead of just the newly created follower
+      if (msg.term > candidate.term) {
         resolve(toFollower(candidate, msg.term));
+        return;
       }
       break;
     case Constants.VOTEREQUEST:

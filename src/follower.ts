@@ -11,8 +11,8 @@ import {
   VoteRequestMessage,
   VoteResponseMessage,
 } from "./util/message-schemas";
-import { setInterval, clearInterval } from "timers";
 import { toCandidate } from "./candidate";
+import { applyCommits } from "./leader";
 
 function toFollower(replica: Candidate | Leader, newTerm: number): Follower {
   return {
@@ -21,6 +21,7 @@ function toFollower(replica: Candidate | Leader, newTerm: number): Follower {
     term: newTerm,
     votedFor: undefined,
     leader: undefined,
+    lastAE: new Date(),
   };
 }
 
@@ -29,7 +30,7 @@ function constructMsgHandler(follower: Follower) {
     console.log(`received:`, msg.toString("utf-8"));
     const parsedMessage = JSON.parse(msg.toString("utf-8"));
     if (isBusinessMsg(parsedMessage)) {
-      handleClientMessage(follower, parsedMessage);
+      sendRedirect(follower, parsedMessage);
     } else if (isProtoMsg(parsedMessage)) {
       handleProtoMsg(follower, parsedMessage);
     }
@@ -42,10 +43,15 @@ function constructMsgHandler(follower: Follower) {
  */
 async function runFollower(follower: Follower): Promise<Candidate> {
   sendStartupMessage(follower);
+  const applyInterval = setInterval(
+    () => applyCommits(follower),
+    (follower.electionTimeout * 4) / 5,
+  );
   const msgHandler = constructMsgHandler(follower);
   follower.config.socket.on("message", msgHandler);
   return checkPulse(follower).then<Candidate>(() => {
     follower.config.socket.off("message", msgHandler);
+    clearInterval(applyInterval);
     return toCandidate(follower);
   });
 }
@@ -63,13 +69,6 @@ function isProtoMsg(msg: Message<any>): boolean {
   ].includes(msg.type);
 }
 
-function handleClientMessage(
-  replica: Follower | Candidate,
-  msg: GetRequestMessage | PutRequestMessage,
-) {
-  replica.leader ? sendRedirect(replica, msg) : sendFail(replica, msg);
-}
-
 function sendRedirect(
   replica: Candidate | Follower,
   msg: GetRequestMessage | PutRequestMessage,
@@ -77,7 +76,7 @@ function sendRedirect(
   sendMessage(replica, {
     src: replica.config.id,
     dst: msg.src,
-    leader: replica.leader,
+    leader: replica.leader ?? Constants.BROADCAST,
     type: Constants.REDIRECT,
     MID: msg.MID,
   });
@@ -109,10 +108,10 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
   } else {
     follower.leader = msg.src;
     follower.term = msg.term;
+    updateCommitIndex(follower, msg.lCommit);
     if (msg.entries.length == 0) {
       return; //heartbeat
     } else {
-      updateCommitIndex(follower, msg.lCommit);
       appendEntries(follower, msg.entries, msg.plogIdx + 1);
       sendMessage(follower, constructAppendResponse(follower, msg, true));
     }
@@ -242,8 +241,8 @@ function sendStartupMessage(replica: Follower) {
 export {
   toFollower,
   runFollower,
-  handleClientMessage,
   isBusinessMsg,
   isProtoMsg,
   voteResponse,
+  sendRedirect,
 };
