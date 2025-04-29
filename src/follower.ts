@@ -98,22 +98,24 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
 
 function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
   follower.lastAE = new Date();
-  if (msg.entries.length == 0) {
-    //heartbeat
-    follower.leader = msg.src;
-    follower.term = msg.term;
-  } else if (msg.term < follower.term) {
-    sendMessage(follower, constructAEResponse(follower, msg, false));
+  if (msg.term < follower.term) {
+    sendMessage(follower, constructAppendResponse(follower, msg, false));
   } else if (
     msg.plogIdx > 0 &&
     (follower.log.length <= msg.plogIdx ||
       follower.log[msg.plogIdx].term !== msg.plogTerm)
   ) {
-    sendMessage(follower, constructAEResponse(follower, msg, false));
+    sendMessage(follower, constructAppendResponse(follower, msg, false));
   } else {
-    updateCommitIndex(follower, msg.lCommit);
-    appendEntries(follower, msg.entries, msg.plogIdx + 1);
-    sendMessage(follower, constructAEResponse(follower, msg, true));
+    follower.leader = msg.src;
+    follower.term = msg.term;
+    if (msg.entries.length == 0) {
+      return; //heartbeat
+    } else {
+      updateCommitIndex(follower, msg.lCommit);
+      appendEntries(follower, msg.entries, msg.plogIdx + 1);
+      sendMessage(follower, constructAppendResponse(follower, msg, true));
+    }
   }
 }
 
@@ -140,7 +142,7 @@ function appendEntries(
   }
 }
 
-function constructAEResponse(
+function constructAppendResponse(
   follower: Follower,
   msg: AppendEntriesMessage,
   success: boolean,
@@ -149,7 +151,7 @@ function constructAEResponse(
     src: follower.config.id,
     dst: msg.src,
     type: Constants.APPENDRESPONSE,
-    leader: follower.leader,
+    leader: follower.leader ?? "FFFF",
     idx: msg.plogIdx + 1,
     term: follower.term,
     success,
