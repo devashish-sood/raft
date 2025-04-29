@@ -72,7 +72,7 @@ interface AppendEntriesMessage extends Message<typeof Constants.APPENDENTRIES> {
 
 interface AppendResponseMessage
   extends Message<typeof Constants.APPENDRESPONSE> {
-  logIdx: number;
+  idx: number;
   term: number;
   success: boolean;
 }

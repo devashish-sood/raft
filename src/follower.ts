@@ -4,7 +4,6 @@ import { Candidate, Command, Follower, Leader, Replica } from "./util/types";
 import {
   AppendEntriesMessage,
   AppendResponseMessage,
-  BusinessMessage,
   GetRequestMessage,
   Message,
   ProtoMessage,
@@ -87,14 +86,7 @@ function sendRedirect(
 function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
-      follower.lastAE = new Date();
-      if (msg.entries.length == 0) {
-        //heartbeat
-        follower.leader = msg.src;
-        follower.term = msg.term;
-      } else {
-        handleAEMessage(follower, msg);
-      }
+      handleAEMessage(follower, msg);
       break;
     case Constants.VOTEREQUEST:
       sendMessage(follower, evaluateCandidate(follower, msg));
@@ -105,7 +97,12 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
 }
 
 function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
-  if (msg.term < follower.term) {
+  follower.lastAE = new Date();
+  if (msg.entries.length == 0) {
+    //heartbeat
+    follower.leader = msg.src;
+    follower.term = msg.term;
+  } else if (msg.term < follower.term) {
     sendMessage(follower, constructAEResponse(follower, msg, false));
   } else if (
     msg.plogIdx > 0 &&
@@ -114,8 +111,15 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
   ) {
     sendMessage(follower, constructAEResponse(follower, msg, false));
   } else {
+    updateCommitIndex(follower, msg.lCommit);
     appendEntries(follower, msg.entries, msg.plogIdx + 1);
     sendMessage(follower, constructAEResponse(follower, msg, true));
+  }
+}
+
+function updateCommitIndex(follower: Follower, leaderCommit: number) {
+  if (leaderCommit > follower.commitIndex) {
+    follower.commitIndex = Math.min(follower.log.length - 1, leaderCommit);
   }
 }
 
@@ -146,7 +150,7 @@ function constructAEResponse(
     dst: msg.src,
     type: Constants.APPENDRESPONSE,
     leader: follower.leader,
-    logIdx: msg.plogIdx + 1,
+    idx: msg.plogIdx + 1,
     term: follower.term,
     success,
   };

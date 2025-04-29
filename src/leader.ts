@@ -39,12 +39,34 @@ function constructHeartbeat(leader: Leader): AppendEntriesMessage {
   };
 }
 
+function applyCommand(replica: Replica, cmd: Command) {
+  replica.store[cmd.key] = cmd.val;
+}
+
+function applyCommits(
+  replica: Replica,
+  clientCallback: (cmd: Command) => void = () => {},
+) {
+  while (replica.lastApplied < replica.commitIndex) {
+    replica.lastApplied += 1;
+    const cmd = replica.log[replica.lastApplied];
+    applyCommand(replica, cmd);
+    clientCallback(cmd);
+  }
+}
+
 async function runLeader(leader: Leader): Promise<Follower> {
+  const hbTimeout = (leader.electionTimeout * 4) / 5;
   sendMessage(leader, constructHeartbeat(leader));
-  const heartbeatInterval = setInterval(
-    () => sendMessage(leader, constructHeartbeat(leader)),
-    (leader.electionTimeout * 4) / 5,
-  );
+  const heartbeatInterval = setInterval(() => {
+    if (Date.now() - leader.lastAE.getTime() >= hbTimeout) {
+      sendMessage(leader, constructHeartbeat(leader));
+    }
+
+    applyCommits(leader, (cmd) => {
+      sendMessage(leader, createPutSuccessMessage(leader, cmd));
+    });
+  }, hbTimeout);
 
   return new Promise<Follower>((resolve, _) => {
     const msgHandler = (msg: Buffer) => {
@@ -142,6 +164,7 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
         // pre-calculate llogidx for messages just to prevent race conditions
         leader.log.push(putCommand);
         sendMessage(leader, createAEMsg(leader, cmdLogIndex, putCommand));
+        leader.lastAE = new Date();
       } catch (e) {
         sendFail(leader, msg);
       }
@@ -151,30 +174,24 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
   }
 }
 
+function updateCommitIdx(leader: Leader) {
+  if (leader.log.length == 0) {
+    return;
+  }
+  const sortedCommits = Object.values(leader.matchIndex).sort((a, b) => b - a);
+  const medianIdx = Math.floor(sortedCommits.length / 2);
+  leader.commitIndex = sortedCommits[medianIdx];
+}
+
 function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
-  const cmd = leader.log[msg.logIdx]; // the command at the log in the response message
-  try {
-    assert(cmd !== undefined);
-
-    if (!cmd.acks.includes(msg.src)) {
-      cmd.acks.push(msg.src);
-    }
-
-    if (
-      cmd.acks.length >= Math.ceil(leader.config.others.length / 2) &&
-      !cmd.acked
-    ) {
-      cmd.acked = true;
-      sendMessage(leader, createPutSuccessMessage(leader, cmd));
-    }
-  } catch (e: unknown) {
-    if (e instanceof AssertionError) {
-      console.log("mismatch between leader log and follower append response.");
-      console.log("Leader log at that position:", cmd);
-      console.log("Follower append response:", msg);
-    } else {
-      throw e;
-    }
+  if (msg.success) {
+    leader.matchIndex[msg.src] = Math.max(
+      leader.matchIndex[msg.src] || 0,
+      msg.idx,
+    );
+    updateCommitIdx(leader);
+  } else {
+    leader.nextIndex[msg.src] = msg.idx;
   }
 }
 

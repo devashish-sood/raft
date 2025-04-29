@@ -22,13 +22,10 @@ type Config = {
 
 type Command = {
   src: string;
-  id: number;
   key: string;
   val: string;
   term: number;
   MID: string;
-  acks: string[];
-  acked: boolean;
 };
 
 type Role = FollowerRole | LeaderRole | CandidateRole;

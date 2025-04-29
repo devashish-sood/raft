@@ -1,4 +1,3 @@
-import { Command } from "commander";
 import dgram from "dgram";
 import { Config, Follower, Replica, ReplicaOptions } from "./util/types";
 import { Constants } from "./util/constants";
@@ -6,6 +5,7 @@ import { randomInt } from "crypto";
 import { runFollower } from "./follower";
 import { runCandidate } from "./candidate";
 import { runLeader } from "./leader";
+import { Command } from "commander";
 
 /**
  * Composite method to create and setup a replica
