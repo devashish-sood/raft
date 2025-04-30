@@ -1,9 +1,9 @@
 import {
+  evaluateCandidate,
   isBusinessMsg,
   isProtoMsg,
   sendRedirect,
   toFollower,
-  voteResponse,
 } from "./follower";
 import { applyCommits, toLeader } from "./leader";
 import { sendMessage } from "./send";
@@ -71,6 +71,7 @@ async function runCandidate(candidate: Candidate): Promise<Replica> {
   const electInterval = setInterval(() => {
     applyCommits(candidate);
     restartElection(candidate);
+    console.log("candidate's new term is: ", candidate.term);
     sendVoteRequests(candidate);
   }, candidate.electionTimeout);
 
@@ -84,22 +85,21 @@ function handleProtoMessage(
 ): void {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
-      if (msg.term > candidate.term) {
+      if (msg.term >= candidate.term) {
         resolve(toFollower(candidate, msg.term));
         return;
       }
       break;
     case Constants.VOTEREQUEST:
-      //
       if (msg.term > candidate.term) {
         const follower = toFollower(candidate, msg.term);
-        sendMessage(follower, voteResponse(follower, msg, true));
+        sendMessage(follower, evaluateCandidate(follower, msg));
         console.log("candidate deferring to", msg.src);
         resolve(follower);
       }
       break;
     case Constants.VOTERESPONSE:
-      if (msg.voteGranted) {
+      if (msg.term == candidate.term && msg.voteGranted) {
         console.log("vote received: ", msg.src);
         candidate.votes.push(msg.src);
         if (

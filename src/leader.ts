@@ -17,8 +17,15 @@ function toLeader(candidate: Candidate): Leader {
     ...candidate,
     role: Constants.LEADER,
     leader: candidate.config.id,
-    nextIndex: {},
-    matchIndex: {},
+    nextIndex: Object.fromEntries(
+      [candidate.config.id, ...candidate.config.others].map((rep) => [
+        rep,
+        candidate.log.length - 1,
+      ]),
+    ),
+    matchIndex: Object.fromEntries(
+      [candidate.config.id, ...candidate.config.others].map((rep) => [rep, 0]),
+    ),
     lastAE: new Date(),
   };
 }
@@ -153,7 +160,6 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
           MID: msg.MID,
           term: leader.term,
         };
-        // pre-calculate llogidx for messages just to prevent race conditions
         leader.log.push(putCommand);
         leader.matchIndex[leader.config.id] = cmdLogIndex + 1;
         updateCommitIdx(leader);
@@ -180,7 +186,7 @@ function updateCommitIdx(leader: Leader) {
 function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
   if (msg.success) {
     leader.matchIndex[msg.src] = Math.max(
-      leader.matchIndex[msg.src] || 0,
+      leader.matchIndex[msg.src] ?? 0,
       msg.idx,
     );
     updateCommitIdx(leader);

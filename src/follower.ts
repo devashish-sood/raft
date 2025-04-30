@@ -162,6 +162,7 @@ function evaluateCandidate(
   msg: VoteRequestMessage,
 ): VoteResponseMessage {
   if (replica.term > msg.term) {
+    console.log("rejecting because self term is greater");
     return voteResponse(replica, msg, false);
   }
   if (replica.term < msg.term) {
@@ -210,11 +211,11 @@ function voteResponse(
 async function checkPulse(follower: Follower) {
   let timer: NodeJS.Timeout;
 
-  const promise = new Promise((resolve, _) => {
+  const promise = new Promise<void>((resolve, _) => {
     timer = setInterval(() => {
       if (Date.now() - follower.lastAE.getTime() >= follower.electionTimeout) {
         clearInterval(timer);
-        resolve(Constants.NOPULSE);
+        resolve();
       }
     }, follower.electionTimeout);
   });
@@ -243,6 +244,6 @@ export {
   runFollower,
   isBusinessMsg,
   isProtoMsg,
-  voteResponse,
+  evaluateCandidate,
   sendRedirect,
 };
