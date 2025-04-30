@@ -104,11 +104,21 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
     (follower.log.length <= msg.plogIdx ||
       follower.log[msg.plogIdx].term !== msg.plogTerm)
   ) {
-    console.log("rejecting because of log issues");
-    console.log(
-      `msg.plogIdx: ${msg.plogIdx}, follower.log.length: ${follower.log.length}, follower.log[msg.plogIdx].term: ${follower.log[msg.plogIdx]?.term}, msg.plogTerm: ${msg.plogTerm}`,
-    );
-    sendMessage(follower, constructAppendResponse(follower, msg, false));
+    if (follower.log.length <= msg.plogIdx) {
+      sendMessage(
+        follower,
+        constructAppendResponse(follower, msg, false, follower.log.length - 1),
+      );
+    } else if (follower.log[msg.plogIdx].term !== msg.plogTerm) {
+      console.log("rejecting because of log issues");
+      console.log(
+        `msg.plogIdx: ${msg.plogIdx}, follower.log.length: ${follower.log.length}, follower.log[msg.plogIdx].term: ${follower.log[msg.plogIdx]?.term}, msg.plogTerm: ${msg.plogTerm}`,
+      );
+      sendMessage(
+        follower,
+        constructAppendResponse(follower, msg, false, msg.plogIdx - 1),
+      );
+    }
   } else {
     follower.leader = msg.src;
     follower.term = msg.term;
@@ -151,13 +161,14 @@ function constructAppendResponse(
   follower: Follower | Candidate,
   msg: AppendEntriesMessage,
   success: boolean,
+  responseIdx: number = follower.log.length - 1,
 ): AppendResponseMessage {
   return {
     src: follower.config.id,
     dst: msg.src,
     type: Constants.APPENDRESPONSE,
     leader: follower.leader ?? "FFFF",
-    idx: success ? follower.log.length - 1 : -1,
+    idx: responseIdx,
     term: follower.term,
     success,
   };

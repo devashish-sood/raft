@@ -196,7 +196,7 @@ function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
     );
     updateCommitIdx(leader);
   } else {
-    leader.nextIndex[msg.src] -= 1;
+    leader.nextIndex[msg.src] -= msg.idx;
     retryAppend(leader, msg.src);
   }
 }
@@ -222,6 +222,7 @@ function handleProtoMessage(
   resolve: (value: Follower) => void,
 ) {
   switch (msg.type) {
+    //TODO: term check and follower resolve, when moved outside of the switch cases, was creating problems at some point. test and fix this later
     case Constants.APPENDENTRIES:
       if (msg.term > leader.term) {
         resolve(toFollower(leader, msg.term));
@@ -229,6 +230,10 @@ function handleProtoMessage(
       }
       break;
     case Constants.APPENDRESPONSE:
+      if (msg.term > leader.term) {
+        resolve(toFollower(leader, msg.term));
+        return;
+      }
       handleAppendResponse(leader, msg);
       break;
     case Constants.VOTEREQUEST:
