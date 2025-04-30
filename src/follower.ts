@@ -104,12 +104,17 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
     (follower.log.length <= msg.plogIdx ||
       follower.log[msg.plogIdx].term !== msg.plogTerm)
   ) {
+    console.log("rejecting because of log issues");
+    console.log(
+      `msg.plogIdx: ${msg.plogIdx}, follower.log.length: ${follower.log.length}, follower.log[msg.plogIdx].term: ${follower.log[msg.plogIdx]?.term}, msg.plogTerm: ${msg.plogTerm}`,
+    );
     sendMessage(follower, constructAppendResponse(follower, msg, false));
   } else {
     follower.leader = msg.src;
     follower.term = msg.term;
     updateCommitIndex(follower, msg.lCommit);
     if (msg.entries.length == 0) {
+      sendMessage(follower, constructAppendResponse(follower, msg, true));
       return; //heartbeat
     } else {
       appendEntries(follower, msg.entries, msg.plogIdx + 1);
@@ -122,6 +127,7 @@ function updateCommitIndex(follower: Follower, leaderCommit: number) {
   if (leaderCommit > follower.commitIndex) {
     follower.commitIndex = Math.min(follower.log.length - 1, leaderCommit);
   }
+  applyCommits(follower);
 }
 
 function appendEntries(
@@ -142,7 +148,7 @@ function appendEntries(
 }
 
 function constructAppendResponse(
-  follower: Follower,
+  follower: Follower | Candidate,
   msg: AppendEntriesMessage,
   success: boolean,
 ): AppendResponseMessage {
@@ -151,7 +157,7 @@ function constructAppendResponse(
     dst: msg.src,
     type: Constants.APPENDRESPONSE,
     leader: follower.leader ?? "FFFF",
-    idx: msg.plogIdx + 1,
+    idx: success ? follower.log.length - 1 : -1,
     term: follower.term,
     success,
   };
@@ -162,7 +168,6 @@ function evaluateCandidate(
   msg: VoteRequestMessage,
 ): VoteResponseMessage {
   if (replica.term > msg.term) {
-    console.log("rejecting because self term is greater");
     return voteResponse(replica, msg, false);
   }
   if (replica.term < msg.term) {
@@ -246,4 +251,5 @@ export {
   isProtoMsg,
   evaluateCandidate,
   sendRedirect,
+  constructAppendResponse,
 };

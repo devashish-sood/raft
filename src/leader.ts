@@ -13,7 +13,7 @@ import {
 import { sendFail, sendMessage } from "./send";
 
 function toLeader(candidate: Candidate): Leader {
-  return {
+  const leader = {
     ...candidate,
     role: Constants.LEADER,
     leader: candidate.config.id,
@@ -24,10 +24,15 @@ function toLeader(candidate: Candidate): Leader {
       ]),
     ),
     matchIndex: Object.fromEntries(
-      [candidate.config.id, ...candidate.config.others].map((rep) => [rep, 0]),
+      [candidate.config.id, ...candidate.config.others].map((rep) => [
+        rep,
+        rep === candidate.config.id ? candidate.log.length - 1 : 0,
+      ]),
     ),
     lastAE: new Date(),
   };
+  updateCommitIdx(leader);
+  return leader;
 }
 
 function constructHeartbeat(leader: Leader): AppendEntriesMessage {
@@ -62,7 +67,7 @@ function applyCommits(
 }
 
 async function runLeader(leader: Leader): Promise<Follower> {
-  const hbTimeout = (leader.electionTimeout * 4) / 5;
+  const hbTimeout = (leader.electionTimeout * 3) / 5;
   sendMessage(leader, constructHeartbeat(leader));
   const heartbeatInterval = setInterval(() => {
     if (Date.now() - leader.lastAE.getTime() >= hbTimeout) {
@@ -191,8 +196,24 @@ function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
     );
     updateCommitIdx(leader);
   } else {
-    leader.nextIndex[msg.src] = msg.idx;
+    leader.nextIndex[msg.src] -= 1;
+    retryAppend(leader, msg.src);
   }
+}
+
+function retryAppend(leader: Leader, dst: string) {
+  const ae: AppendEntriesMessage = {
+    src: leader.config.id,
+    dst: dst,
+    type: Constants.APPENDENTRIES,
+    term: leader.term,
+    leader: leader.config.id,
+    plogIdx: leader.nextIndex[dst],
+    plogTerm: leader.log[leader.nextIndex[dst]]?.term ?? 0,
+    entries: leader.log.slice(leader.nextIndex[dst] + 1),
+    lCommit: leader.commitIndex,
+  };
+  sendMessage(leader, ae);
 }
 
 function handleProtoMessage(

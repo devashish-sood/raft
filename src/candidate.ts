@@ -1,4 +1,5 @@
 import {
+  constructAppendResponse,
   evaluateCandidate,
   isBusinessMsg,
   isProtoMsg,
@@ -18,14 +19,14 @@ function toCandidate(replica: Follower | Candidate): Candidate {
     role: Constants.CANDIDATE,
     votedFor: replica.config.id,
     leader: undefined,
-    votes: [],
+    votes: [replica.config.id],
     lastAE: new Date(),
   };
 }
 
 function restartElection(candidate: Candidate) {
   candidate.term += 1;
-  candidate.votes = [];
+  candidate.votes = [candidate.config.id];
   candidate.votedFor = candidate.config.id;
 }
 
@@ -88,6 +89,9 @@ function handleProtoMessage(
       if (msg.term >= candidate.term) {
         resolve(toFollower(candidate, msg.term));
         return;
+      } else {
+        sendMessage(candidate, constructAppendResponse(candidate, msg, false));
+        return;
       }
       break;
     case Constants.VOTEREQUEST:
@@ -99,12 +103,17 @@ function handleProtoMessage(
       }
       break;
     case Constants.VOTERESPONSE:
-      if (msg.term == candidate.term && msg.voteGranted) {
+      if (
+        msg.term == candidate.term &&
+        msg.voteGranted &&
+        !candidate.votes.includes(msg.src)
+      ) {
         console.log("vote received: ", msg.src);
         candidate.votes.push(msg.src);
+        console.log(candidate.votes);
         if (
           candidate.votes.length >=
-          Math.ceil(candidate.config.others.length / 2)
+          Math.ceil((candidate.config.others.length + 1) / 2)
         ) {
           console.log("leader elected!");
           resolve(toLeader(candidate));
