@@ -56,7 +56,7 @@ function createReplica(config: Config): Follower {
     electionTimeout: randomInt(150, 300),
     votedFor: undefined,
     log: [],
-    commitIndex: 0,
+    commitIndex: -1,
     lastApplied: 0,
     store: {},
     config,

@@ -58,11 +58,14 @@ function applyCommits(
   replica: Replica,
   clientCallback: (cmd: Command) => void = () => {},
 ) {
-  while (replica.lastApplied < replica.commitIndex) {
-    replica.lastApplied += 1;
+  if (replica.commitIndex < 0) {
+    return;
+  }
+  while (replica.lastApplied <= replica.commitIndex) {
     const cmd = replica.log[replica.lastApplied];
     applyCommand(replica, cmd);
     clientCallback(cmd);
+    replica.lastApplied += 1;
   }
 }
 
