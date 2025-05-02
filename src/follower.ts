@@ -48,7 +48,7 @@ function constructMsgHandler(follower: Follower) {
 async function runFollower(follower: Follower): Promise<Candidate> {
   follower.lastAE = new Date();
   const applyInterval = setInterval(
-    () => applyCommits(follower),
+    async () => await applyCommits(follower),
     (follower.electionTimeout * 4) / 5,
   );
   const msgHandler = constructMsgHandler(follower);
@@ -113,7 +113,7 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
   follower.leader = msg.src;
   follower.term = msg.term;
   if (
-    msg.plogIdx > 0 &&
+    msg.plogIdx >= 0 &&
     (follower.log.length <= msg.plogIdx ||
       follower.log[msg.plogIdx].term !== msg.plogTerm)
   ) {
@@ -123,32 +123,32 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
         constructAppendResponse(follower, msg, false, follower.log.length - 1),
       );
     } else if (follower.log[msg.plogIdx].term !== msg.plogTerm) {
-      console.log("rejecting because of log issues");
-      console.log(
-        `msg.plogIdx: ${msg.plogIdx}, follower.log.length: ${follower.log.length}, follower.log[msg.plogIdx].term: ${follower.log[msg.plogIdx]?.term}, msg.plogTerm: ${msg.plogTerm}`,
-      );
+      // console.log("rejecting because of log issues");
+      // console.log(
+      //   `msg.plogIdx: ${msg.plogIdx}, follower.log.length: ${follower.log.length}, follower.log[msg.plogIdx].term: ${follower.log[msg.plogIdx]?.term}, msg.plogTerm: ${msg.plogTerm}`,
+      // );
       sendMessage(
         follower,
         constructAppendResponse(follower, msg, false, msg.plogIdx - 1),
       );
     }
   } else {
-    updateCommitIndex(follower, msg.lCommit);
     if (msg.entries.length == 0) {
       sendMessage(follower, constructAppendResponse(follower, msg, true));
       return; //heartbeat
     } else {
       appendEntries(follower, msg.entries, msg.plogIdx + 1);
+      updateCommitIndex(follower, msg.lCommit);
       sendMessage(follower, constructAppendResponse(follower, msg, true));
     }
   }
 }
 
-function updateCommitIndex(follower: Follower, leaderCommit: number) {
+async function updateCommitIndex(follower: Follower, leaderCommit: number) {
   if (leaderCommit > follower.commitIndex) {
     follower.commitIndex = Math.min(follower.log.length - 1, leaderCommit);
   }
-  applyCommits(follower);
+  await applyCommits(follower);
 }
 
 function appendEntries(

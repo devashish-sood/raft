@@ -71,7 +71,7 @@ function createReplica(config: Config): Follower {
     role: Constants.FOLLOWER,
     leader: Constants.BROADCAST,
     term: 0,
-    electionTimeout: randomInt(150, 300),
+    electionTimeout: randomInt(175, 325),
     votedFor: undefined,
     log: [],
     commitIndex: -1,

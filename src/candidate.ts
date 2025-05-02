@@ -71,13 +71,13 @@ async function sendVoteRequests(candidate: Candidate): Promise<void> {
 
 async function runCandidate(candidate: Candidate): Promise<Replica> {
   const electInterval = setInterval(async () => {
-    applyCommits(candidate);
+    await applyCommits(candidate);
     restartElection(candidate);
     console.log("candidate's new term is: ", candidate.term);
     await sendVoteRequests(candidate);
   }, candidate.electionTimeout);
 
-  console.log("candidate's new term is: ", candidate.term);
+  console.log("candidate's term is: ", candidate.term);
   await sendVoteRequests(candidate);
 
   return handleMessages(candidate, electInterval);

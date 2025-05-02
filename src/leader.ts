@@ -56,13 +56,15 @@ function applyCommand(replica: Replica, cmd: Command) {
 
 async function applyCommits(
   replica: Replica,
-  clientCallback: (cmd: Command) => Promise<void> = async (cmd) => {},
+  clientCallback: (cmd: Command) => Promise<void> = async () => {},
 ) {
   if (replica.commitIndex < 0) {
     return;
   }
   while (replica.lastApplied <= replica.commitIndex) {
+    // console.log(`Last Applied: ${replica.lastApplied}, Commit Index: ${replica.commitIndex}, Log Length: ${replica.log.length}`)
     const cmd = replica.log[replica.lastApplied];
+    // console.log(cmd === undefined ? cmd : "ndu")
     applyCommand(replica, cmd);
     await clientCallback(cmd);
     replica.lastApplied += 1;
