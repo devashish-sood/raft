@@ -54,9 +54,9 @@ function applyCommand(replica: Replica, cmd: Command) {
   replica.store[cmd.key] = cmd.val;
 }
 
-function applyCommits(
+async function applyCommits(
   replica: Replica,
-  clientCallback: (cmd: Command) => void = () => {},
+  clientCallback: (cmd: Command) => Promise<void> = async (cmd) => {},
 ) {
   if (replica.commitIndex < 0) {
     return;
@@ -64,7 +64,7 @@ function applyCommits(
   while (replica.lastApplied <= replica.commitIndex) {
     const cmd = replica.log[replica.lastApplied];
     applyCommand(replica, cmd);
-    clientCallback(cmd);
+    await clientCallback(cmd);
     replica.lastApplied += 1;
   }
 }
@@ -77,9 +77,9 @@ async function runLeader(leader: Leader): Promise<Follower> {
       await sendMessage(leader, constructHeartbeat(leader));
     }
 
-    applyCommits(leader, async (cmd) => {
-      await sendMessage(leader, createPutSuccessMessage(leader, cmd));
-    });
+    // applyCommits(leader, async (cmd) => {
+    //   await sendMessage(leader, createPutSuccessMessage(leader, cmd));
+    // });
   }, hbTimeout);
 
   return new Promise<Follower>((resolve, _) => {
@@ -182,13 +182,16 @@ async function handleClientMessage(leader: Leader, msg: BusinessMessage) {
   }
 }
 
-function updateCommitIdx(leader: Leader) {
+async function updateCommitIdx(leader: Leader) {
   if (leader.log.length == 0) {
     return;
   }
   const sortedCommits = Object.values(leader.matchIndex).sort((a, b) => b - a);
   const medianIdx = Math.floor(sortedCommits.length / 2);
   leader.commitIndex = Math.max(sortedCommits[medianIdx], leader.commitIndex);
+  await applyCommits(leader, async (cmd) => {
+    await sendMessage(leader, createPutSuccessMessage(leader, cmd));
+  });
 }
 
 function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
