@@ -72,17 +72,17 @@ async function applyCommits(
 }
 
 async function runLeader(leader: Leader): Promise<Follower> {
-  const hbTimeout = (leader.electionTimeout * 3) / 5;
   await sendMessage(leader, constructHeartbeat(leader));
   const heartbeatInterval = setInterval(async () => {
-    if (Date.now() - leader.lastAE.getTime() >= hbTimeout) {
+    if (Date.now() - leader.lastAE.getTime() >= leader.electionTimeout - 10) {
       await sendMessage(leader, constructHeartbeat(leader));
+      leader.lastAE = new Date();
     }
 
     // applyCommits(leader, async (cmd) => {
     //   await sendMessage(leader, createPutSuccessMessage(leader, cmd));
     // });
-  }, hbTimeout);
+  }, leader.electionTimeout);
 
   return new Promise<Follower>((resolve, _) => {
     const msgHandler = (msg: Buffer) => {

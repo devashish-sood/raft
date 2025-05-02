@@ -47,15 +47,15 @@ function constructMsgHandler(follower: Follower) {
  */
 async function runFollower(follower: Follower): Promise<Candidate> {
   follower.lastAE = new Date();
-  const applyInterval = setInterval(
-    async () => await applyCommits(follower),
-    (follower.electionTimeout * 4) / 5,
-  );
+  // const applyInterval = setInterval(
+  //   async () => await applyCommits(follower),
+  //   (follower.electionTimeout * 4) / 5,
+  // );
   const msgHandler = constructMsgHandler(follower);
   follower.config.socket.on("message", msgHandler);
   return checkPulse(follower).then<Candidate>(() => {
     follower.config.socket.off("message", msgHandler);
-    clearInterval(applyInterval);
+    // clearInterval(applyInterval);
     return toCandidate(follower);
   });
 }
@@ -103,7 +103,7 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
   }
 }
 
-function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
+async function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
   follower.lastAE = new Date();
   if (msg.term < follower.term) {
     sendMessage(follower, constructAppendResponse(follower, msg, false));
@@ -135,12 +135,11 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
   } else {
     if (msg.entries.length == 0) {
       sendMessage(follower, constructAppendResponse(follower, msg, true));
-      return; //heartbeat
     } else {
       appendEntries(follower, msg.entries, msg.plogIdx + 1);
-      updateCommitIndex(follower, msg.lCommit);
       sendMessage(follower, constructAppendResponse(follower, msg, true));
     }
+    await updateCommitIndex(follower, msg.lCommit);
   }
 }
 
