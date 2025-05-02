@@ -1,6 +1,7 @@
 import {
   constructAppendResponse,
   evaluateCandidate,
+  handleAEMessage,
   isBusinessMsg,
   isProtoMsg,
   sendRedirect,
@@ -53,10 +54,10 @@ function handleMessages(candidate: Candidate, electInterval: NodeJS.Timeout) {
   });
 }
 
-function sendVoteRequests(candidate: Candidate): void {
+async function sendVoteRequests(candidate: Candidate): Promise<void> {
   const lastLogIndex = candidate.log.length - 1;
 
-  sendMessage(candidate, {
+  await sendMessage(candidate, {
     src: candidate.config.id,
     dst: Constants.BROADCAST,
     leader: candidate.leader ?? Constants.BROADCAST,
@@ -69,36 +70,43 @@ function sendVoteRequests(candidate: Candidate): void {
 }
 
 async function runCandidate(candidate: Candidate): Promise<Replica> {
-  const electInterval = setInterval(() => {
+  const electInterval = setInterval(async () => {
     applyCommits(candidate);
     restartElection(candidate);
     console.log("candidate's new term is: ", candidate.term);
-    sendVoteRequests(candidate);
+    await sendVoteRequests(candidate);
   }, candidate.electionTimeout);
+
+  console.log("candidate's new term is: ", candidate.term);
+  await sendVoteRequests(candidate);
 
   return handleMessages(candidate, electInterval);
 }
 
-function handleProtoMessage(
+async function handleProtoMessage(
   candidate: Candidate,
   msg: ProtoMessage,
   resolve: any,
-): void {
+): Promise<void> {
   switch (msg.type) {
     case Constants.APPENDENTRIES:
       if (msg.term >= candidate.term) {
-        resolve(toFollower(candidate, msg.term));
-        return;
+        const follower = toFollower(candidate, msg.term);
+        handleAEMessage(follower, msg);
+        resolve(follower);
       } else {
-        sendMessage(candidate, constructAppendResponse(candidate, msg, false));
+        await sendMessage(
+          candidate,
+          constructAppendResponse(candidate, msg, false),
+        );
         return;
       }
       break;
     case Constants.VOTEREQUEST:
       if (msg.term > candidate.term) {
         const follower = toFollower(candidate, msg.term);
-        sendMessage(follower, evaluateCandidate(follower, msg));
-        console.log("candidate deferring to", msg.src);
+        await sendMessage(follower, evaluateCandidate(follower, msg));
+        console.log("candidate stepping down due to", msg.src);
         resolve(follower);
       }
       break;

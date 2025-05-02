@@ -71,14 +71,14 @@ function applyCommits(
 
 async function runLeader(leader: Leader): Promise<Follower> {
   const hbTimeout = (leader.electionTimeout * 3) / 5;
-  sendMessage(leader, constructHeartbeat(leader));
-  const heartbeatInterval = setInterval(() => {
+  await sendMessage(leader, constructHeartbeat(leader));
+  const heartbeatInterval = setInterval(async () => {
     if (Date.now() - leader.lastAE.getTime() >= hbTimeout) {
-      sendMessage(leader, constructHeartbeat(leader));
+      await sendMessage(leader, constructHeartbeat(leader));
     }
 
-    applyCommits(leader, (cmd) => {
-      sendMessage(leader, createPutSuccessMessage(leader, cmd));
+    applyCommits(leader, async (cmd) => {
+      await sendMessage(leader, createPutSuccessMessage(leader, cmd));
     });
   }, hbTimeout);
 
@@ -150,10 +150,10 @@ function createPutSuccessMessage(
   };
 }
 
-function handleClientMessage(leader: Leader, msg: BusinessMessage) {
+async function handleClientMessage(leader: Leader, msg: BusinessMessage) {
   switch (msg.type) {
     case Constants.GET:
-      sendMessage(
+      await sendMessage(
         leader,
         createGetSuccessMsg(leader, msg, leader.store[msg.key] ?? ""),
       );
@@ -171,7 +171,7 @@ function handleClientMessage(leader: Leader, msg: BusinessMessage) {
         leader.log.push(putCommand);
         leader.matchIndex[leader.config.id] = cmdLogIndex + 1;
         updateCommitIdx(leader);
-        sendMessage(leader, createAEMsg(leader, cmdLogIndex, putCommand));
+        await sendMessage(leader, createAEMsg(leader, cmdLogIndex, putCommand));
         leader.lastAE = new Date();
       } catch (e) {
         sendFail(leader, msg);
@@ -188,7 +188,7 @@ function updateCommitIdx(leader: Leader) {
   }
   const sortedCommits = Object.values(leader.matchIndex).sort((a, b) => b - a);
   const medianIdx = Math.floor(sortedCommits.length / 2);
-  leader.commitIndex = sortedCommits[medianIdx];
+  leader.commitIndex = Math.max(sortedCommits[medianIdx], leader.commitIndex);
 }
 
 function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
@@ -199,12 +199,12 @@ function handleAppendResponse(leader: Leader, msg: AppendResponseMessage) {
     );
     updateCommitIdx(leader);
   } else {
-    leader.nextIndex[msg.src] -= msg.idx;
+    leader.nextIndex[msg.src] = msg.idx;
     retryAppend(leader, msg.src);
   }
 }
 
-function retryAppend(leader: Leader, dst: string) {
+async function retryAppend(leader: Leader, dst: string) {
   const ae: AppendEntriesMessage = {
     src: leader.config.id,
     dst: dst,
@@ -216,7 +216,7 @@ function retryAppend(leader: Leader, dst: string) {
     entries: leader.log.slice(leader.nextIndex[dst] + 1),
     lCommit: leader.commitIndex,
   };
-  sendMessage(leader, ae);
+  await sendMessage(leader, ae);
 }
 
 function handleProtoMessage(

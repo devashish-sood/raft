@@ -14,13 +14,17 @@ import {
 import { toCandidate } from "./candidate";
 import { applyCommits } from "./leader";
 
-function toFollower(replica: Candidate | Leader, newTerm: number): Follower {
+function toFollower(
+  replica: Candidate | Leader,
+  newTerm: number,
+  newLeader: string | undefined = undefined,
+): Follower {
   return {
     ...replica,
     role: Constants.FOLLOWER,
     term: newTerm,
     votedFor: undefined,
-    leader: undefined,
+    leader: newLeader,
     lastAE: new Date(),
   };
 }
@@ -42,7 +46,7 @@ function constructMsgHandler(follower: Follower) {
  * @param config the `Replica` config
  */
 async function runFollower(follower: Follower): Promise<Candidate> {
-  sendStartupMessage(follower);
+  follower.lastAE = new Date();
   const applyInterval = setInterval(
     () => applyCommits(follower),
     (follower.electionTimeout * 4) / 5,
@@ -88,7 +92,11 @@ function handleProtoMsg(follower: Follower, msg: ProtoMessage) {
       handleAEMessage(follower, msg);
       break;
     case Constants.VOTEREQUEST:
-      sendMessage(follower, evaluateCandidate(follower, msg));
+      const evaluation = evaluateCandidate(follower, msg);
+      if (evaluation.voteGranted) {
+        follower.lastAE = new Date();
+      }
+      sendMessage(follower, evaluation);
       break;
     default:
       console.log("Received an unexpected message", msg.type, msg);
@@ -99,7 +107,12 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
   follower.lastAE = new Date();
   if (msg.term < follower.term) {
     sendMessage(follower, constructAppendResponse(follower, msg, false));
-  } else if (
+    return;
+  }
+
+  follower.leader = msg.src;
+  follower.term = msg.term;
+  if (
     msg.plogIdx > 0 &&
     (follower.log.length <= msg.plogIdx ||
       follower.log[msg.plogIdx].term !== msg.plogTerm)
@@ -120,8 +133,6 @@ function handleAEMessage(follower: Follower, msg: AppendEntriesMessage) {
       );
     }
   } else {
-    follower.leader = msg.src;
-    follower.term = msg.term;
     updateCommitIndex(follower, msg.lCommit);
     if (msg.entries.length == 0) {
       sendMessage(follower, constructAppendResponse(follower, msg, true));
@@ -239,22 +250,6 @@ async function checkPulse(follower: Follower) {
   return promise;
 }
 
-/**
- * Sends a startup message to the simulator, from this replica.
- *
- * @param {Replica} replica - The replica to send the message to.
- * @throws when `sendMessage` fails
- */
-function sendStartupMessage(replica: Follower) {
-  const startupMessage = {
-    src: replica.config.id,
-    dst: Constants.BROADCAST,
-    leader: Constants.BROADCAST,
-    type: Constants.HELLO,
-  };
-  sendMessage(replica, startupMessage);
-}
-
 export {
   toFollower,
   runFollower,
@@ -263,4 +258,5 @@ export {
   evaluateCandidate,
   sendRedirect,
   constructAppendResponse,
+  handleAEMessage,
 };

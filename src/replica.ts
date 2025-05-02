@@ -6,12 +6,14 @@ import { runFollower } from "./follower";
 import { runCandidate } from "./candidate";
 import { runLeader } from "./leader";
 import { Command } from "commander";
+import { sendMessage } from "./send";
 
 /**
  * Composite method to create and setup a replica
  */
 async function runReplica() {
   let replica: Replica = createReplica(await createConfig(setupArgs()));
+  sendStartupMessage(replica);
   while (true) {
     switch (replica.role) {
       case Constants.FOLLOWER: {
@@ -28,6 +30,22 @@ async function runReplica() {
       }
     }
   }
+}
+
+/**
+ * Sends a startup message to the simulator, from this replica.
+ *
+ * @param {Replica} replica - The replica to send the message to.
+ * @throws when `sendMessage` fails
+ */
+function sendStartupMessage(replica: Follower) {
+  const startupMessage = {
+    src: replica.config.id,
+    dst: Constants.BROADCAST,
+    leader: Constants.BROADCAST,
+    type: Constants.HELLO,
+  };
+  sendMessage(replica, startupMessage);
 }
 
 /**
